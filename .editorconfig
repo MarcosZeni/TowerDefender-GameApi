@@ -1,0 +1,82 @@
+# =============================================================================
+#  Tower of Argentum — estilo de archivo
+#
+#  El charset es lo único que no es preferencia: el proyecto va entero en
+#  español con acentos y eñes (CLAUDE.md, regla de oro 4). Un archivo guardado
+#  en la codificación de Windows convierte "información" en "informaciÃ³n" al
+#  leerlo desde otra herramienta, y el bug aparece lejos de donde se causó.
+#
+#  Latin-1 vive SOLO adentro del importador de .dat, en memoria, y lo que sale
+#  de ahí se escribe en UTF-8.
+# =============================================================================
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+# Dos espacios al final son un salto de línea en Markdown. Recortarlos rompe
+# el formato del documento sin que se note en el diff.
+trim_trailing_whitespace = false
+
+[*.{tscn,tres,godot,import}]
+# Los escribe Godot. Que ninguna herramienta los reformatee: el diff tiene que
+# mostrar lo que cambió el editor, no lo que cambió el editor de texto.
+indent_style = tab
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[*.cs]
+indent_size = 4
+
+# --- using ---
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_using_directive_placement = outside_namespace:warning
+
+# --- namespace ---
+# Una llave y un nivel de indentación menos en todo el archivo.
+csharp_style_namespace_declarations = file_scoped:warning
+
+# --- var ---
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# --- llaves ---
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+
+# --- nombres ---
+dotnet_naming_rule.tipos_en_pascal.severity = warning
+dotnet_naming_rule.tipos_en_pascal.symbols = tipos
+dotnet_naming_rule.tipos_en_pascal.style = pascal
+
+dotnet_naming_symbols.tipos.applicable_kinds = class, struct, interface, enum, delegate, method, property, event
+dotnet_naming_symbols.tipos.applicable_accessibilities = *
+
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+dotnet_naming_rule.campos_privados_con_guion.severity = suggestion
+dotnet_naming_rule.campos_privados_con_guion.symbols = campos_privados
+dotnet_naming_rule.campos_privados_con_guion.style = guion_bajo_camel
+
+dotnet_naming_symbols.campos_privados.applicable_kinds = field
+dotnet_naming_symbols.campos_privados.applicable_accessibilities = private
+
+dotnet_naming_style.guion_bajo_camel.capitalization = camel_case
+dotnet_naming_style.guion_bajo_camel.required_prefix = _
+
+[*.{sln}]
+end_of_line = crlf

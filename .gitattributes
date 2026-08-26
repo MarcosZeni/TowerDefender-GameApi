@@ -1,0 +1,43 @@
+# =============================================================================
+#  Normalización de fin de línea y marcado de binarios
+#
+#  Sin Godot acá: este repo es .NET puro. La lista es más corta a propósito,
+#  igual que el .gitignore (CLAUDE.md: los tres no son iguales a propósito).
+# =============================================================================
+
+# LF adentro del repo, siempre. Git decide qué hay en el disco de cada uno.
+* text=auto eol=lf
+
+*.cs        text diff=csharp
+*.csproj    text
+*.props     text
+*.targets   text
+*.json      text
+*.md        text
+*.yml       text
+
+# -----------------------------------------------------------------------------
+#  Las migraciones
+#
+#  Se corren a mano con `mysql < archivo.sql` (CLAUDE.md). LF explícito: el
+#  cliente de MySQL de Windows tolera CRLF, pero el mismo archivo pasado por
+#  una tubería en Linux se come los \r adentro de los literales de texto.
+# -----------------------------------------------------------------------------
+*.sql       text eol=lf
+
+# La solución la escribe Visual Studio y la quiere con CRLF.
+*.sln       text eol=crlf
+
+# El .bat lo lee cmd.exe, que quiere CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.sh        text eol=lf
+
+# -----------------------------------------------------------------------------
+#  Binarios
+# -----------------------------------------------------------------------------
+*.dll       binary
+*.exe       binary
+*.zip       binary
+*.pfx       binary
+*.png       binary

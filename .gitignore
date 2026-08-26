@@ -427,3 +427,37 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+
+# =============================================================================
+#  Austral TD  —  reglas propias del proyecto
+#
+#  Lo de arriba es la plantilla VisualStudio.gitignore de GitHub.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+#  Secretos y configuración local
+# -----------------------------------------------------------------------------
+# appsettings.json SÍ se versiona, con las claves VACÍAS: es el que documenta
+# qué campos existen. La cadena de conexión real va en el .Local.json.
+#
+# En el LoginServer de Austral esa disciplina se rompió: hay una Internal.ApiKey
+# real trackeada en git, contra lo que dice su propio comentario. Acá no.
+
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+*.key
+
+
+# -----------------------------------------------------------------------------
+#  Volcados de la base
+# -----------------------------------------------------------------------------
+# Las migraciones de sql\ SÍ se versionan: son la única descripción del esquema
+# que existe. Los dumps con datos, no.
+
+*.sql.gz
+*.sql.bak
+dump_*.sql
+backup_*.sql

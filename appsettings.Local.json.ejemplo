@@ -1,0 +1,7 @@
+{
+  "_comment": "PLANTILLA. Copiar a appsettings.Local.json (ese lo bloquea el .gitignore). En local el usuario de MySQL va SIN contrasena, asi que la cadena no lleva Password: ver el encabezado de sql/000_base_y_usuario.sql. En produccion se le pone una con el ALTER USER del final de ese archivo, y aca se agrega Password=...",
+
+  "ConnectionStrings": {
+    "Default": "Server=127.0.0.1;Port=46000;Database=towerdef;User ID=towerdef;CharSet=utf8mb4"
+  }
+}
