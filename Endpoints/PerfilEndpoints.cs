@@ -180,12 +180,23 @@ public static class PerfilEndpoints
 /// </remarks>
 public static class CatalogoPlanos
 {
+    // ⚠ La clave es la KEY del plano, no su nombre (cambiado el 2026-08-27).
+    //
+    // Antes decía "Onda de Frío". El nombre del plano pasó a vivir en los
+    // archivos de idioma del cliente y cambia con el idioma: un jugador en inglés
+    // habría mandado "Cone of Cold" y el servidor le habría contestado
+    // «plano_desconocido». La key —«ondaDeFrio»— es la misma en todos los idiomas
+    // y sale de `Datos\perks.json` del cliente.
+    //
+    // ⚠ La columna `planos_cuenta.plano` guarda esta misma cadena. Las filas
+    // escritas antes del cambio tienen el nombre viejo y NO van a matchear: hay
+    // que migrarlas o borrarlas.
     private static readonly Dictionary<string, int> _precios = new(StringComparer.Ordinal)
     {
-        // "Perforación" no está: es la receta inicial, conocida sin comprar. Sin
+        // "perforacion" no está: es la receta inicial, conocida sin comprar. Sin
         // al menos una, un jugador nuevo nunca ve un Único y la mecánica de fusión
         // le resulta invisible.
-        ["Onda de Frío"] = 4000,
+        ["ondaDeFrio"] = 4000,
     };
 
     public static int? PrecioDe(string? plano)
