@@ -11,9 +11,13 @@
 --
 --    Por qué es tolerable acá y no allá: el usuario está atado a
 --    'towerdef'@'127.0.0.1', y MySQL filtra por host ANTES de mirar la
---    credencial. Aunque el servidor escuche en 0.0.0.0:46000 —que es como está
---    hoy en esta máquina—, una conexión desde la red no llega ni a intentar
---    autenticarse con este usuario: la rechaza por host.
+--    credencial. Y aunque el servidor llegara a escuchar en 0.0.0.0:46000, una
+--    conexión desde la red no llegaría ni a intentar autenticarse con este
+--    usuario: la rechaza por host.
+--
+--    Hoy en esta máquina hay además un segundo cerrojo, un escalón antes: el
+--    `my-46000.ini` del servicio MySQL8TD trae `bind-address=127.0.0.1`, así que
+--    el puerto ni siquiera se abre hacia la red.
 --
 --    Lo que sí puede: cualquier proceso que corra EN ESTA MÁQUINA se conecta
 --    sin credencial. En una máquina de desarrollo es un riesgo aceptado; en un
