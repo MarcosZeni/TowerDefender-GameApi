@@ -11,8 +11,13 @@ public sealed record PedidoPlano(string Plano);
 
 public sealed record RespuestaCompraPlano(string Plano, int Precio, long OroRestante);
 
+/// <summary>Un plano a la venta, con su precio.</summary>
+public sealed record FilaPlano(string Plano, int Precio);
+
+public sealed record RespuestaPlanos(FilaPlano[] Planos);
+
 /// <summary>
-/// <c>/perfil/me</c>, <c>/ranking</c> y <c>/tienda/plano</c>.
+/// <c>/perfil/me</c>, <c>/ranking</c>, <c>/tienda/planos</c> y <c>/tienda/plano</c>.
 /// </summary>
 public static class PerfilEndpoints
 {
@@ -20,7 +25,39 @@ public static class PerfilEndpoints
     {
         app.MapGet("/perfil/me", PerfilAsync);
         app.MapGet("/ranking", RankingAsync);
+        app.MapGet("/tienda/planos", ListarPlanos);
         app.MapPost("/tienda/plano", ComprarPlanoAsync);
+    }
+
+    /// <summary>
+    /// La lista de precios de la tienda de planos.
+    /// </summary>
+    /// <remarks>
+    /// <para>⚠ <b>Existe porque el precio vive del lado del servidor y el cliente
+    /// no tenía forma de saberlo.</b> La pantalla de la tienda dibujaba nueve
+    /// filas con un botón «comprar» y ninguna decía cuánto costaba: el jugador
+    /// apretaba para averiguar el precio, y el que no le alcanzaba se enteraba con
+    /// un error. Poner el precio en el <c>planos.json</c> del cliente no era una
+    /// opción — ese archivo entra al hash de <c>/run/start</c>, así que cambiar un
+    /// precio invalidaría la temporada.</para>
+    ///
+    /// <para><b>Sin token, como el ranking.</b> Los precios no son de nadie, y qué
+    /// planos tiene la cuenta ya lo dice <c>/perfil/me</c>: la pantalla cruza las
+    /// dos listas. Pedir token acá sería pedirlo para leer una lista de precios
+    /// pública.</para>
+    ///
+    /// <para><b>El plano inicial no está en la lista</b>, porque no se vende. El
+    /// cliente lo sabe por su propio <c>planos.json</c> (<c>"initial": true</c>) y
+    /// lo dibuja como conocido.</para>
+    /// </remarks>
+    private static IResult ListarPlanos()
+    {
+        var filas = new List<FilaPlano>();
+
+        foreach (var (plano, precio) in CatalogoPlanos.Todos)
+            filas.Add(new FilaPlano(plano, precio));
+
+        return Results.Ok(new RespuestaPlanos([.. filas]));
     }
 
     private static async Task<IResult> PerfilAsync(
@@ -191,13 +228,48 @@ public static class CatalogoPlanos
     // ⚠ La columna `planos_cuenta.plano` guarda esta misma cadena. Las filas
     // escritas antes del cambio tienen el nombre viejo y NO van a matchear: hay
     // que migrarlas o borrarlas.
+    //
+    // ⚠ ESTÁN LOS OCHO, Y ANTES ESTABA SOLO «ondaDeFrio». La pantalla del cliente
+    // lista los nueve planos de su `planos.json` y ofrecía comprar los ocho que no
+    // son el inicial: siete de esos ocho botones contestaban «plano_desconocido»,
+    // porque acá no había precio. Un catálogo incompleto del lado del servidor no
+    // se ve como un catálogo incompleto: se ve como una tienda rota.
+    //
+    // ⚠ TODOS AL MISMO PRECIO, a propósito. Los nueve Únicos no son mejores unos
+    // que otros — son para clases distintas —, así que un precio escalonado
+    // inventaría una jerarquía que el balance no tiene y empujaría a comprar «el
+    // barato primero» en vez de «el de la clase que juego». La decisión que la
+    // tienda tiene que hacer interesante es CUÁL, no en qué orden.
+    //
+    // El número sale del oro que deja una corrida: `oleada² / 2`, más 5.000 por
+    // ganar. Una corrida normal que llega a la 65 deja ~2.100, una ganada deja
+    // 10.000. A 4.000 cada uno, los ocho salen 32.000 — del orden de quince
+    // corridas buenas o tres ganadas. Es caro a propósito: son la única
+    // progresión permanente del proyecto y la lista es finita, así que el techo
+    // se alcanza igual; lo único que se elige es cuánto tarda.
     private static readonly Dictionary<string, int> _precios = new(StringComparer.Ordinal)
     {
         // "perforacion" no está: es la receta inicial, conocida sin comprar. Sin
         // al menos una, un jugador nuevo nunca ve un Único y la mecánica de fusión
         // le resulta invisible.
         ["ondaDeFrio"] = 4000,
+        ["iraDeDios"] = 4000,
+        ["apocalipsis"] = 4000,
+        ["terribleHambre"] = 4000,
+        ["tormentaDivina"] = 4000,
+        ["ceguera"] = 4000,
+        ["fuerza"] = 4000,
+        ["invisibilidad"] = 4000,
     };
+
+    /// <summary>
+    /// Todo lo que se vende, para <c>GET /tienda/planos</c>.
+    /// </summary>
+    /// <remarks>
+    /// El orden no importa: el cliente dibuja en el orden de <b>su</b>
+    /// <c>planos.json</c> y busca el precio por key.
+    /// </remarks>
+    public static IReadOnlyDictionary<string, int> Todos => _precios;
 
     public static int? PrecioDe(string? plano)
         => plano is not null && _precios.TryGetValue(plano, out int precio) ? precio : null;
