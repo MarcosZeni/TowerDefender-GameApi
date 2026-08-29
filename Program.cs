@@ -51,18 +51,36 @@ if (string.IsNullOrWhiteSpace(connectionString))
         "o la variable de entorno ConnectionStrings__Default.");
 }
 
-var database = new Database(connectionString);
-var gate = new HashGate(config.Seguridad);
+// -----------------------------------------------------------------------------
+// Los números del juego
+//
+// ⚠ NO están en appsettings.json, y es a propósito. Eso es config de DESPLIEGUE
+// —a qué base me conecto, cuánto dura un token— y cambia de una máquina a otra.
+// Esto es BALANCE: cuánto oro deja una corrida, qué sale un plano. Es el mismo
+// número en todas las máquinas, y quien lo edita quiere leer al lado POR QUÉ es
+// ese número. En appsettings.json un comentario no tiene dónde ir, y una variable
+// de entorno de un hosting podría cambiar el balance sin dejar rastro.
+//
+// Si falta un archivo o un número no cierra, esto TIRA y la API no arranca. No
+// hay tabla de reserva compilada: un servidor que reparte oro con valores
+// inventados porque no encontró el archivo se descubre en la billetera de un
+// jugador, semanas después.
+// -----------------------------------------------------------------------------
+var datos = ServerDataLoader.Load(ServerDataLoader.DefaultFolder);
 
+var database = new Database(connectionString);
+var gate = new HashGate(config.Security);
+
+builder.Services.AddSingleton(datos);
 builder.Services.AddSingleton(config);
-builder.Services.AddSingleton(config.Seguridad);
+builder.Services.AddSingleton(config.Security);
 builder.Services.AddSingleton(database);
 builder.Services.AddSingleton(gate);
-builder.Services.AddSingleton(new PasswordHasher(config.Seguridad));
-builder.Services.AddSingleton(new CuentaRepositorio(database));
-builder.Services.AddSingleton(new TokenRepositorio(database));
-builder.Services.AddSingleton(new RunRepositorio(database));
-builder.Services.AddSingleton(new IntentoRepositorio(database));
+builder.Services.AddSingleton(new PasswordHasher(config.Security));
+builder.Services.AddSingleton(new AccountRepository(database));
+builder.Services.AddSingleton(new TokenRepository(database));
+builder.Services.AddSingleton(new RunRepository(database));
+builder.Services.AddSingleton(new LoginAttemptRepository(database));
 
 // -----------------------------------------------------------------------------
 // Rate limit por IP
@@ -75,7 +93,7 @@ builder.Services.AddSingleton(new IntentoRepositorio(database));
 // Lo que NO puede hacer es acordarse: se reinicia la API y se olvida de todo, y
 // con dos instancias cada una cuenta por su lado.
 //
-// De eso se ocupa la otra mitad, IntentoRepositorio, que cuenta sobre
+// De eso se ocupa la otra mitad, LoginAttemptRepository, que cuenta sobre
 // intentos_login adentro del endpoint de login. Mismo techo, dos lugares donde se
 // aplica, y ninguno alcanza solo: sacar este convertiría cada pedido de una
 // avalancha en una consulta a MySQL.
@@ -87,7 +105,7 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (contexto, ct) =>
     {
         contexto.HttpContext.Response.Headers.RetryAfter = "60";
-        await contexto.HttpContext.Response.WriteAsJsonAsync(ErrorResponse.DemasiadosIntentos, ct);
+        await contexto.HttpContext.Response.WriteAsJsonAsync(ErrorResponse.TooManyAttempts, ct);
     };
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(http =>
@@ -95,7 +113,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: (http.Connection.RemoteIpAddress ?? IPAddress.None).ToString(),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = config.Seguridad.MaxIntentosPorIpPorMinuto,
+                PermitLimit = config.Security.MaxAttemptsPerIpPerMinute,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
             }));
@@ -103,18 +121,15 @@ builder.Services.AddRateLimiter(options =>
 
 builder.WebHost.ConfigureKestrel(kestrel =>
 {
-    // ⚠ 12 MB y no 4 KB, porque /run/finish manda el log de acciones de una
-    // corrida de 100 oleadas: horas de juego, decenas de miles de acciones. El
-    // endpoint recorta a 8 MB y marca `log_truncado`, así que este techo tiene
-    // que estar por encima de ese, con lugar para el base64 (que infla ~33%).
-    //
-    // El número definitivo sale cuando haya un log real medido. Hasta entonces,
-    // pecar de generoso: rechazar un finish después de tres horas bien jugadas es
-    // lo peor que puede hacer este servidor.
-    kestrel.Limits.MaxRequestBodySize = 12 * 1024 * 1024;
+    // ⚠ Megabytes y no los 4 KB del LoginServer, porque /run/finish manda el log
+    // de acciones de una corrida de 100 oleadas: horas de juego, decenas de miles
+    // de acciones. El número y el porqué están en `GameData\economia.json`, junto al
+    // tope del log que este tiene que superar; el cargador verifica que no queden
+    // al revés.
+    kestrel.Limits.MaxRequestBodySize = datos.Limits.MaxBodyBytes;
     kestrel.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(30);
     kestrel.AddServerHeader = false;
-    kestrel.Limits.MaxConcurrentConnections = config.Seguridad.MaxConexionesConcurrentes;
+    kestrel.Limits.MaxConcurrentConnections = config.Security.MaxConcurrentConnections;
 
     // Contra slowloris: conexiones que abren y mandan los headers de a un byte
     // para ocupar un lugar sin gastar nada.
@@ -127,7 +142,7 @@ app.UseRateLimiter();
 
 app.MapAuth();
 app.MapRuns();
-app.MapPerfil();
+app.MapProfile();
 
 // El launcher y el monitoreo preguntan acá. Contestar "ok" sin saber si la base
 // está viva no le sirve a nadie, así que se la pinguea.
@@ -138,7 +153,7 @@ app.MapGet("/health", async (Database db, ApiConfig cfg, CancellationToken ct) =
     {
         estado = baseOk ? "ok" : "degradado",
         baseDatos = baseOk ? "ok" : "caida",
-        datosVersion = cfg.DatosVersion,
+        datosVersion = cfg.DataVersion,
     }, statusCode: baseOk ? 200 : 503);
 });
 
@@ -155,7 +170,7 @@ var log = app.Services.GetRequiredService<ILogger<Program>>();
     var bd = new MySqlConnectionStringBuilder(connectionString);
     log.LogInformation(
         "Base '{Base}' en {Servidor}:{Puerto} (usuario {Usuario}) · datos v{Version}",
-        bd.Database, bd.Server, bd.Port, bd.UserID, config.DatosVersion);
+        bd.Database, bd.Server, bd.Port, bd.UserID, config.DataVersion);
 }
 
 // Dónde quedó escuchando de verdad, que no siempre es lo que dice la config: la
@@ -179,7 +194,7 @@ app.Lifetime.ApplicationStarted.Register(() =>
 // base sin migrar— y sin este chequeo se descubre recién en el primer pedido de
 // un jugador, como un 500 con un mensaje de MySQL que no dice qué hacer.
 // -----------------------------------------------------------------------------
-var schema = await new SchemaCheck(database).CorrerAsync(CancellationToken.None);
+var schema = await new SchemaCheck(database).RunAsync(CancellationToken.None);
 
 if (!schema.Alcanzable)
 {
@@ -190,9 +205,9 @@ if (!schema.Alcanzable)
         "La API arranca igual, pero ningún pedido va a funcionar hasta que MySQL vuelva.",
         schema.ErrorConexion);
 }
-else if (schema.Problemas.Count > 0)
+else if (schema.Problems.Count > 0)
 {
-    string detalle = string.Join(Environment.NewLine, schema.Problemas.Select(p => "  · " + p));
+    string detalle = string.Join(Environment.NewLine, schema.Problems.Select(p => "  · " + p));
 
     log.LogCritical(
         "La base no tiene el schema que esta API necesita:{Detalle}",

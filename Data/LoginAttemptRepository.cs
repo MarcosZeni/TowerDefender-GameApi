@@ -23,9 +23,9 @@ namespace TowerOfArgentum.Api.Data;
 /// mil IPs con un intento cada una, ninguna llega a su límite por IP, y todas
 /// apuntan a la misma cuenta.</para>
 /// </remarks>
-public sealed class IntentoRepositorio(Database db)
+public sealed class LoginAttemptRepository(Database db)
 {
-    public async Task RegistrarAsync(IPAddress? ip, string? nick, bool exito, CancellationToken ct)
+    public async Task RegisterAsync(IPAddress? ip, string? nick, bool exito, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -35,7 +35,7 @@ public sealed class IntentoRepositorio(Database db)
             VALUES (@ip, @nick, @exito, UTC_TIMESTAMP(3))
             """, conn);
 
-        cmd.Parameters.AddWithValue("@ip", (object?)CuentaRepositorio.Normalizar(ip) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@ip", (object?)AccountRepository.Normalize(ip) ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@nick", (object?)nick ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@exito", exito ? 1 : 0);
 
@@ -43,9 +43,9 @@ public sealed class IntentoRepositorio(Database db)
     }
 
     /// <summary>Intentos de esa IP en el último minuto.</summary>
-    public async Task<int> IntentosDeIpAsync(IPAddress? ip, CancellationToken ct)
+    public async Task<int> IpAttemptsAsync(IPAddress? ip, CancellationToken ct)
     {
-        byte[]? bytes = CuentaRepositorio.Normalizar(ip);
+        byte[]? bytes = AccountRepository.Normalize(ip);
 
         if (bytes is null)
             return 0;
@@ -72,7 +72,7 @@ public sealed class IntentoRepositorio(Database db)
     /// dejar afuera a otro tirándole contraseñas mal a su nombre — y el dueño
     /// legítimo quedaría bloqueado sin haber hecho nada.
     /// </remarks>
-    public async Task<int> FallosDeNickAsync(string nick, int ventanaMinutos, CancellationToken ct)
+    public async Task<int> NickFailuresAsync(string nick, int ventanaMinutos, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -103,7 +103,7 @@ public sealed class IntentoRepositorio(Database db)
     /// crece para siempre. El <c>LIMIT</c> evita que un barrido atrasado bloquee
     /// la tabla por un rato largo.
     /// </remarks>
-    public async Task<int> BarrerAsync(int diasRetencion, CancellationToken ct)
+    public async Task<int> SweepAsync(int diasRetencion, CancellationToken ct)
     {
         if (diasRetencion <= 0)
             return 0;

@@ -1,0 +1,80 @@
+{
+  // ---------------------------------------------------------------------------
+  //  LO QUE EL SERVIDOR DECIDE SOLO: la billetera y los topes del reclamo.
+  //
+  //  ⚠ NADA DE ESTO PUEDE VENIR DEL CLIENTE. `/run/finish` reporta hasta dónde
+  //  llegó y el servidor deriva el oro; si el cliente mandara el oro, oro falso
+  //  compraría todos los planos y se volvería poder real. La columna `validado`
+  //  no sería freno, porque el oro se gasta al instante.
+  //
+  //  ⚠ NO ENTRA A NINGÚN HASH. Estos números no son entrada de la simulación
+  //  —la corrida ya terminó cuando se aplican—, así que cambiarlos NO es
+  //  temporada nueva. Lo que sí hacen es cambiar cuánto tarda un jugador en
+  //  comprar un plano: ver planos.json.
+  // ---------------------------------------------------------------------------
+  "version": 1,
+
+  // El oro que va a la BILLETERA al terminar una corrida. No es el oro de la
+  // corrida, que vive y muere adentro de ella: esto es lo permanente.
+  //
+  //     oro = oleada² / divisorOleada        (+ bonusPorGanar si ganó)
+  //
+  // ⚠ CUADRÁTICO Y NO LINEAL, a propósito: llegar a la 80 tiene que valer
+  // bastante más que el doble de llegar a la 40, o no hay ningún incentivo para
+  // seguir mejorando una vez que se llegó a un lugar cómodo.
+  //
+  // Con los números de fábrica: la oleada 40 deja 800, la 65 deja ~2.100, la 80
+  // deja 3.200 y ganar (la 100) deja 10.000.
+  "billetera": {
+    // Divide el cuadrado de la oleada. Más alto = corridas que rinden menos.
+    "divisorOleada": 2,
+
+    // El bonus por ganar, aparte y grande: es el objetivo del juego. Vale como
+    // media corrida perfecta otra vez.
+    "bonusPorGanar": 5000
+  },
+
+  // Los topes con los que se recorta el reclamo del cliente antes de guardarlo.
+  // El cliente puede mandar cualquier cosa: lo que entra a la base son estos
+  // rangos, no lo que llegó.
+  "limites": {
+    // ⚠ La corrida son 100 oleadas y TERMINA ahí, matando al jefe final del
+    // área 8. No hay modo sin fin, no hay área 9. Este número es las dos cosas a
+    // la vez: el techo del clamp Y la única oleada en la que se puede GANAR — un
+    // reclamo de «gané en la 40» es imposible por reglas del juego y se rechaza
+    // entero en vez de corregirse en silencio.
+    "oleadaMaxima": 100,
+
+    // Las ocho áreas reales de AO, recorridas sin cortes.
+    "areaMinima": 1,
+    "areaMaxima": 8,
+
+    // Tope del log de acciones ya decodificado. Más que esto entra recortado y
+    // la fila queda marcada con `log_truncado`.
+    //
+    // ⚠ Un log recortado NO invalida la corrida: se guarda igual y queda con
+    // validado = 0 para siempre, que es exactamente lo que corresponde.
+    // Rechazar el finish castigaría al jugador por un problema de tamaño después
+    // de tres horas bien jugadas, y eso es lo peor que puede hacer este servidor.
+    //
+    // 8 MiB. El número definitivo sale cuando haya un log real medido; hasta
+    // entonces, pecar de generoso.
+    "maxLogBytes": 8388608,
+
+    // Techo del cuerpo del request en Kestrel.
+    //
+    // ⚠ TIENE QUE SER MAYOR QUE maxLogBytes, con lugar para el base64, que infla
+    // ~33%. Si queda por debajo, Kestrel corta la conexión antes de que el
+    // endpoint pueda recortar el log, y el jugador pierde la corrida entera en
+    // vez de perder el final del log. 12 MiB contra 8 deja el margen justo.
+    "maxCuerpoBytes": 12582912,
+
+    // Techo de ticks al REVALIDAR una corrida, para que un log manipulado no
+    // cuelgue el proceso del servidor en un bucle que no termina nunca.
+    //
+    // A 30 ticks por segundo, un millón son ~9 horas de juego. Una corrida real
+    // de 100 oleadas dura horas, así que el margen está de sobra; lo que esto
+    // corta es un log armado a mano que nunca deja terminar la partida.
+    "maxTicksRevalidacion": 1000000
+  }
+}

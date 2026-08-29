@@ -12,9 +12,9 @@ namespace TowerOfArgentum.Api.Data;
 /// el server de juego, que es otro proceso—. Acá esta misma API los valida en
 /// cada request, así que ese código no existe allá para copiar.
 /// </remarks>
-public sealed class TokenRepositorio(Database db)
+public sealed class TokenRepository(Database db)
 {
-    public async Task GuardarAsync(byte[] tokenHash, long idCuenta, int ttlSegundos, IPAddress? ip, CancellationToken ct)
+    public async Task SaveAsync(byte[] tokenHash, long idCuenta, int ttlSegundos, IPAddress? ip, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -32,7 +32,7 @@ public sealed class TokenRepositorio(Database db)
         cmd.Parameters.AddWithValue("@hash", tokenHash);
         cmd.Parameters.AddWithValue("@cuenta", idCuenta);
         cmd.Parameters.AddWithValue("@ttl", ttlSegundos);
-        cmd.Parameters.AddWithValue("@ip", (object?)CuentaRepositorio.Normalizar(ip) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@ip", (object?)AccountRepository.Normalize(ip) ?? DBNull.Value);
 
         await cmd.ExecuteNonQueryAsync(ct);
     }
@@ -45,7 +45,7 @@ public sealed class TokenRepositorio(Database db)
     /// la base es lo que garantiza que las dos puntas —el <c>expira</c> escrito y
     /// el "ahora" con el que se compara— salgan del mismo reloj.
     /// </remarks>
-    public async Task<long?> CanjearAsync(byte[] tokenHash, CancellationToken ct)
+    public async Task<long?> RedeemAsync(byte[] tokenHash, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -62,7 +62,7 @@ public sealed class TokenRepositorio(Database db)
         return resultado is null or DBNull ? null : Convert.ToInt64(resultado);
     }
 
-    public async Task BorrarAsync(byte[] tokenHash, CancellationToken ct)
+    public async Task DeleteAsync(byte[] tokenHash, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
         await using var cmd = new MySqlCommand("DELETE FROM tokens WHERE token_hash = @hash", conn);
@@ -80,7 +80,7 @@ public sealed class TokenRepositorio(Database db)
     /// que un barrido atrasado bloquee la tabla por un rato largo — se van
     /// llevando de a mil por login.
     /// </remarks>
-    public async Task<int> BarrerVencidosAsync(CancellationToken ct)
+    public async Task<int> SweepExpiredAsync(CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
         await using var cmd = new MySqlCommand(

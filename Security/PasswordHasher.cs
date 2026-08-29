@@ -29,7 +29,7 @@ namespace TowerOfArgentum.Api.Security;
 /// contraseña se verifica con los parámetros con los que se creó y se re-hashea
 /// sola la próxima vez que su dueño entra.</para>
 /// </summary>
-public sealed class PasswordHasher(ConfigSeguridad config)
+public sealed class PasswordHasher(SecurityConfig config)
 {
     private const int SaltBytes = 16;
     private const int HashBytes = 32;

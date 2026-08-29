@@ -4,7 +4,7 @@ using MySqlConnector;
 namespace TowerOfArgentum.Api.Data;
 
 /// <summary>Lo que hay que saber de una cuenta para atender un request.</summary>
-public sealed record Cuenta(long Id, string Nick, string Password, long Oro);
+public sealed record Account(long Id, string Nick, string Password, long Gold);
 
 /// <summary>
 /// Consultas sobre <c>cuentas</c>.
@@ -15,9 +15,9 @@ public sealed record Cuenta(long Id, string Nick, string Password, long Oro);
 /// las que son. Un ORM acá agregaría una capa que hay que aprender para leer un
 /// <c>SELECT</c> de tres líneas.
 /// </remarks>
-public sealed class CuentaRepositorio(Database db)
+public sealed class AccountRepository(Database db)
 {
-    public async Task<Cuenta?> BuscarPorNickAsync(string nick, CancellationToken ct)
+    public async Task<Account?> FindByNickAsync(string nick, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -33,10 +33,10 @@ public sealed class CuentaRepositorio(Database db)
         if (!await r.ReadAsync(ct))
             return null;
 
-        return new Cuenta(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt64(3));
+        return new Account(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt64(3));
     }
 
-    public async Task<Cuenta?> BuscarPorIdAsync(long id, CancellationToken ct)
+    public async Task<Account?> FindByIdAsync(long id, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
         await using var cmd = new MySqlCommand(
@@ -48,7 +48,7 @@ public sealed class CuentaRepositorio(Database db)
         if (!await r.ReadAsync(ct))
             return null;
 
-        return new Cuenta(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt64(3));
+        return new Account(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetInt64(3));
     }
 
     /// <summary>
@@ -60,7 +60,7 @@ public sealed class CuentaRepositorio(Database db)
     /// puede tomar el mismo nombre, y bajo registro simultáneo esa ventana se
     /// abre de verdad. La base es el único árbitro que no tiene carrera.
     /// </remarks>
-    public async Task<long?> CrearAsync(string nick, string passwordPhc, string? email, IPAddress? ip, CancellationToken ct)
+    public async Task<long?> CreateAsync(string nick, string passwordPhc, string? email, IPAddress? ip, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -73,7 +73,7 @@ public sealed class CuentaRepositorio(Database db)
         cmd.Parameters.AddWithValue("@nick", nick);
         cmd.Parameters.AddWithValue("@password", passwordPhc);
         cmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@ip", (object?)Normalizar(ip) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@ip", (object?)Normalize(ip) ?? DBNull.Value);
 
         try
         {
@@ -86,19 +86,19 @@ public sealed class CuentaRepositorio(Database db)
         }
     }
 
-    public async Task MarcarAccesoAsync(long idCuenta, IPAddress? ip, CancellationToken ct)
+    public async Task MarkAccessAsync(long idCuenta, IPAddress? ip, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
         await using var cmd = new MySqlCommand(
             "UPDATE cuentas SET ultimo_acceso = UTC_TIMESTAMP(3), ultima_ip = @ip WHERE id = @id", conn);
 
         cmd.Parameters.AddWithValue("@id", idCuenta);
-        cmd.Parameters.AddWithValue("@ip", (object?)Normalizar(ip) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@ip", (object?)Normalize(ip) ?? DBNull.Value);
 
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
-    public async Task ActualizarPasswordAsync(long idCuenta, string passwordPhc, CancellationToken ct)
+    public async Task UpdatePasswordAsync(long idCuenta, string passwordPhc, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
         await using var cmd = new MySqlCommand(
@@ -120,7 +120,7 @@ public sealed class CuentaRepositorio(Database db)
     /// la columna <c>validado</c> no sirve de freno porque el oro se gasta al
     /// instante.
     /// </remarks>
-    public async Task SumarOroAsync(long idCuenta, long oro, CancellationToken ct)
+    public async Task AddGoldAsync(long idCuenta, long oro, CancellationToken ct)
     {
         if (oro <= 0)
             return;
@@ -136,7 +136,7 @@ public sealed class CuentaRepositorio(Database db)
     }
 
     /// <summary>IPv4 mapeado a 4 bytes, IPv6 a 16. Es lo que espera VARBINARY(16).</summary>
-    public static byte[]? Normalizar(IPAddress? ip)
+    public static byte[]? Normalize(IPAddress? ip)
     {
         if (ip is null)
             return null;

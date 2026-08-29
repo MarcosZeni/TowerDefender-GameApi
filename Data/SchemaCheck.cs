@@ -18,7 +18,7 @@ namespace TowerOfArgentum.Api.Data;
 public sealed class SchemaCheck(Database db)
 {
     /// <summary>Qué tabla tiene que existir y con qué columnas críticas.</summary>
-    private static readonly (string Tabla, string[] Columnas, string Archivo)[] _requerido =
+    private static readonly (string Tabla, string[] Columns, string Archivo)[] _requerido =
     [
         ("cuentas", ["id", "nick", "password", "oro"], "001_cuentas.sql"),
         ("tokens", ["token_hash", "id_cuenta", "expira"], "002_tokens.sql"),
@@ -35,9 +35,9 @@ public sealed class SchemaCheck(Database db)
         ("intentos_login", ["ip", "nick", "exito", "cuando"], "005_intentos_login.sql"),
     ];
 
-    public sealed record Resultado(bool Alcanzable, string? ErrorConexion, List<string> Problemas);
+    public sealed record Resultado(bool Alcanzable, string? ErrorConexion, List<string> Problems);
 
-    public async Task<Resultado> CorrerAsync(CancellationToken ct)
+    public async Task<Resultado> RunAsync(CancellationToken ct)
     {
         var problemas = new List<string>();
 

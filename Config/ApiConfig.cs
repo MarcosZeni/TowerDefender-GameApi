@@ -20,12 +20,12 @@ public sealed class ApiConfig
     /// <summary>
     /// Versión de los datos de balance con la que corre este servidor.
     ///
-    /// No es cosmético: los JSON de <c>Client\Datos\</c> son entrada de la
+    /// No es cosmético: los JSON de <c>Client\Data\</c> son entrada de la
     /// simulación, así que cambiar un número de balance vuelve irreplicables
     /// las corridas viejas. Cada rebalanceo es una temporada del ranking, y
     /// este número es el que las separa (DATOS.md §7).
     /// </summary>
-    public int DatosVersion { get; init; } = 1;
+    public int DataVersion { get; init; } = 1;
 
     /// <summary>
     /// Hash de los datos de balance con los que corre el servidor.
@@ -38,7 +38,7 @@ public sealed class ApiConfig
     ///
     /// <para>Vacío = no se verifica, para desarrollo.</para>
     /// </remarks>
-    public string HashDatos { get; init; } = "";
+    public string DataHash { get; init; } = "";
 
-    public ConfigSeguridad Seguridad { get; init; } = new();
+    public SecurityConfig Security { get; init; } = new();
 }

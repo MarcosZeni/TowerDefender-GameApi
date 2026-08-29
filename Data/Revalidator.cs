@@ -1,10 +1,11 @@
 using MySqlConnector;
-using TowerOfArgentum.Simulacion;
+using TowerOfArgentum.Api.Config;
+using TowerOfArgentum.Simulation;
 
 namespace TowerOfArgentum.Api.Data;
 
 /// <summary>Qué dio revalidar una corrida.</summary>
-public sealed record ResultadoRevalidacion(
+public sealed record RevalidationResult(
     long IdRun,
     bool Coincide,
     string Detalle,
@@ -34,15 +35,13 @@ public sealed record ResultadoRevalidacion(
 /// devuelve un detalle y no un veredicto: el que decide qué hacer con una corrida
 /// que no coincide es una persona.</para>
 /// </remarks>
-public sealed class Revalidador(Database db)
+public sealed class Revalidator(Database db, ServerData datos)
 {
-    /// <summary>Techo, para que un log manipulado no cuelgue el proceso.</summary>
-    private const int TechoTicks = 1_000_000;
-
     /// <summary>
     /// Revalida una corrida y actualiza su columna <c>validado</c>.
     /// </summary>
-    public async Task<ResultadoRevalidacion?> RevalidarAsync(long idRun, CancellationToken ct)
+    public async Task<RevalidationResult?> RevalidateAsync(
+        long idRun, BalanceData balance, CancellationToken ct)
     {
         var fila = await LeerAsync(idRun, ct);
 
@@ -53,16 +52,16 @@ public sealed class Revalidador(Database db)
 
         if (blob is null || blob.Length == 0)
         {
-            return new ResultadoRevalidacion(
+            return new RevalidationResult(
                 idRun, false, "sin log: no se puede revalidar",
                 ticksReclamados, 0, oleadaReclamada, 0);
         }
 
-        var log = LogBinario.Leer(blob);
+        var log = BinaryLog.Read(blob);
 
-        if (log.Cantidad == 0)
+        if (log.Count == 0)
         {
-            return new ResultadoRevalidacion(
+            return new RevalidationResult(
                 idRun, false, "el log no se pudo leer o está vacío",
                 ticksReclamados, 0, oleadaReclamada, 0);
         }
@@ -70,36 +69,38 @@ public sealed class Revalidador(Database db)
         // ⚠ El layout sale de la MISMA cuenta que en el cliente. Si las dos
         // fórmulas se separaran, el servidor re-simularía en otro mapa y todas
         // las corridas darían distinto.
-        var mapa = Layouts.Elegir(new Aleatorio(seed ^ 0x1A5E5EEDUL));
+        var mapa = Layouts.Choose(seed, balance);
 
-        // TODO: los datos de balance de la temporada de esa corrida. Hoy usa los
-        // provisorios, así que el resultado solo sirve para corridas jugadas con
-        // esos mismos datos. Cuando el servidor cargue los JSON versionados, acá
-        // hay que pedirle los de `datos_version` de la fila.
-        var partida = new Partida(seed, mapa, log);
-        partida.Empezar();
+        // ⚠ TODO: el balance TIENE que ser el de la temporada de esa corrida,
+        // o sea el de `datos_version` de la fila. Hoy lo elige quien llama, y
+        // nadie llama todavía: el servidor no carga los JSON de balance del
+        // cliente. Revalidar con otros números da un resultado distinto y
+        // acusaría de trampa a un jugador honesto.
+        var partida = new Run(seed, mapa, log, balance);
+        partida.Start();
 
-        while (partida.Estado == EstadoPartida.EnCurso && partida.Tick < TechoTicks)
-            partida.Avanzar();
+        while (partida.State == RunState.InProgress &&
+               partida.Tick < datos.Limits.MaxRevalidationTicks)
+            partida.Advance();
 
-        bool ganoReal = partida.Estado == EstadoPartida.Gano;
+        bool ganoReal = partida.State == RunState.Won;
 
         bool coincide =
             partida.Tick == ticksReclamados &&
-            partida.Oleada == oleadaReclamada &&
+            partida.Wave == oleadaReclamada &&
             ganoReal == ganoReclamado;
 
         string detalle = coincide
             ? "coincide"
             : $"reclamó oleada {oleadaReclamada} en {ticksReclamados} ticks " +
-              $"(gano={ganoReclamado}); la re-simulación da oleada {partida.Oleada} " +
+              $"(gano={ganoReclamado}); la re-simulación da oleada {partida.Wave} " +
               $"en {partida.Tick} ticks (gano={ganoReal})";
 
         await MarcarAsync(idRun, coincide, ct);
 
-        return new ResultadoRevalidacion(
+        return new RevalidationResult(
             idRun, coincide, detalle,
-            ticksReclamados, partida.Tick, oleadaReclamada, partida.Oleada);
+            ticksReclamados, partida.Tick, oleadaReclamada, partida.Wave);
     }
 
     /// <summary>
@@ -109,7 +110,8 @@ public sealed class Revalidador(Database db)
     /// Pensado para correr en lote, a mano o desde una tarea programada. De a
     /// pocas: cada una es una simulación completa y puede llevar segundos de CPU.
     /// </remarks>
-    public async Task<List<ResultadoRevalidacion>> RevalidarPendientesAsync(int cuantas, CancellationToken ct)
+    public async Task<List<RevalidationResult>> RevalidatePendingAsync(
+        int cuantas, BalanceData balance, CancellationToken ct)
     {
         var ids = new List<long>();
 
@@ -132,11 +134,11 @@ public sealed class Revalidador(Database db)
                 ids.Add(r.GetInt64(0));
         }
 
-        var salida = new List<ResultadoRevalidacion>(ids.Count);
+        var salida = new List<RevalidationResult>(ids.Count);
 
         foreach (long id in ids)
         {
-            var resultado = await RevalidarAsync(id, ct);
+            var resultado = await RevalidateAsync(id, balance, ct);
 
             if (resultado is not null)
                 salida.Add(resultado);
@@ -145,7 +147,7 @@ public sealed class Revalidador(Database db)
         return salida;
     }
 
-    private async Task<(ulong Seed, bool Gano, int Oleada, int Ticks, byte[]? Log)?> LeerAsync(
+    private async Task<(ulong Seed, bool Won, int Wave, int Ticks, byte[]? Log)?> LeerAsync(
         long idRun, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);

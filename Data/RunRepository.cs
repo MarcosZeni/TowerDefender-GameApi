@@ -1,18 +1,25 @@
+using System.Text.Json.Serialization;
 using MySqlConnector;
 
 namespace TowerOfArgentum.Api.Data;
 
 /// <summary>Una fila del ranking.</summary>
-public sealed record FilaRanking(
-    int Puesto, string Nick, bool Gano, int Oleada, int Area, int Ticks, bool Validado);
+public sealed record RankingRow(
+    [property: JsonPropertyName("puesto")] int Position,
+    string Nick,
+    [property: JsonPropertyName("gano")] bool Won,
+    [property: JsonPropertyName("oleada")] int Wave,
+    int Area,
+    int Ticks,
+    [property: JsonPropertyName("validado")] bool Validated);
 
 /// <summary>Una corrida abierta.</summary>
-public sealed record RunAbierta(long Id, ulong Seed, int DatosVersion);
+public sealed record OpenRun(long Id, ulong Seed, int DataVersion);
 
 /// <summary>
 /// Consultas sobre <c>runs</c>.
 /// </summary>
-public sealed class RunRepositorio(Database db)
+public sealed class RunRepository(Database db)
 {
     /// <summary>
     /// Abre una corrida y cierra la anterior como <c>abandono</c>.
@@ -81,7 +88,7 @@ public sealed class RunRepositorio(Database db)
     }
 
     /// <summary>Busca una corrida abierta de esa cuenta, por id.</summary>
-    public async Task<RunAbierta?> BuscarAbiertaAsync(long idRun, long idCuenta, CancellationToken ct)
+    public async Task<OpenRun?> FindOpenAsync(long idRun, long idCuenta, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -101,7 +108,7 @@ public sealed class RunRepositorio(Database db)
         if (!await r.ReadAsync(ct))
             return null;
 
-        return new RunAbierta(r.GetInt64(0), r.GetUInt64(1), r.GetInt32(2));
+        return new OpenRun(r.GetInt64(0), r.GetUInt64(1), r.GetInt32(2));
     }
 
     /// <summary>
@@ -113,7 +120,7 @@ public sealed class RunRepositorio(Database db)
     /// necesario para poder hacerlo: la seed está en la fila y el log entra acá.
     /// Lo que no se escribió hoy no se agrega mañana.
     /// </remarks>
-    public async Task CerrarAsync(
+    public async Task CloseAsync(
         long idRun, bool gano, int oleada, int area, int ticks,
         byte[]? log, bool logTruncado, CancellationToken ct)
     {
@@ -165,7 +172,7 @@ public sealed class RunRepositorio(Database db)
     /// <para>⚠ <b>No hay filtro de mapa.</b> Con corrida roguelike continua el
     /// área no se elige: se llega o no se llega.</para>
     /// </remarks>
-    public async Task<List<FilaRanking>> RankingAsync(int datosVersion, int limite, CancellationToken ct)
+    public async Task<List<RankingRow>> RankingAsync(int datosVersion, int limite, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -183,14 +190,14 @@ public sealed class RunRepositorio(Database db)
         cmd.Parameters.AddWithValue("@version", datosVersion);
         cmd.Parameters.AddWithValue("@limite", limite);
 
-        var filas = new List<FilaRanking>(limite);
+        var filas = new List<RankingRow>(limite);
         int puesto = 0;
 
         await using var r = await cmd.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct))
         {
             puesto++;
-            filas.Add(new FilaRanking(
+            filas.Add(new RankingRow(
                 puesto,
                 r.GetString(0),
                 r.GetInt32(1) != 0,

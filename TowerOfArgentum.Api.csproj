@@ -15,6 +15,21 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
+  <!-- Los números del juego: precios de planos y la fórmula de la billetera.
+
+       ⚠ Van al lado del ejecutable o la API NO ARRANCA. El SDK Web ya incluye
+       todo `**/*.json` como Content y hoy los copiaría igual; esto lo deja
+       DECLARADO, porque depender de un glob implícito del SDK para que el
+       servidor encuentre sus datos es una dependencia que nadie ve hasta que se
+       rompe en un deploy.
+
+       No están en appsettings.json a propósito: eso es config de despliegue y
+       cambia por máquina; esto es balance, es igual en todas, y lleva el porqué
+       de cada número comentado al lado. Ver Config\ServerData.cs. -->
+  <ItemGroup>
+    <Content Update="GameData\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="MySqlConnector" Version="2.4.0" />
     <PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
@@ -27,9 +42,9 @@
          compila. Ver nuget.config.
 
          ⚠ Si falla la restauración, correr una vez, en el repo del cliente:
-             cd Client/Simulacion
+             cd Client/Simulation
              dotnet pack -c Release -->
-    <PackageReference Include="TowerOfArgentum.Simulacion" Version="0.1.0" />
+    <PackageReference Include="TowerOfArgentum.Simulation" Version="0.1.0" />
   </ItemGroup>
 
   <!-- ⚠ Lo que NO se referencia, y es deliberado (CLAUDE.md):

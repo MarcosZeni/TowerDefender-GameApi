@@ -1,0 +1,50 @@
+{
+  // ---------------------------------------------------------------------------
+  //  LOS PLANOS QUE SE VENDEN, CON SU PRECIO.
+  //
+  //  ⚠ ESTE ARCHIVO ES LA AUTORIDAD SOBRE EL PRECIO. El cliente NUNCA lo manda:
+  //  `POST /tienda/plano` recibe solo la key y el precio sale de acá. Si lo
+  //  mandara el cliente, se compraría todo a un peso.
+  //
+  //  ⚠ Y NO PUEDE VIVIR EN EL CLIENTE. `Client\Data\planos.json` entra al hash
+  //  de /run/start: corregir un precio ahí invalidaría la temporada del ranking.
+  //  Acá no entra a ningún hash, así que tocar un número NO es temporada nueva.
+  //
+  //  Los planos son, junto con la billetera, la ÚNICA PROGRESIÓN PERMANENTE DEL
+  //  PROYECTO. La lista es finita, y esa es la regla que hace tolerable la
+  //  ventaja del veterano: tiene techo.
+  //
+  //  Las "key" son las mismas de `Client\Data\planos.json` y las mismas que
+  //  guarda la columna `planos_cuenta.plano`. No son nombres: el nombre vive en
+  //  los archivos de idioma del cliente y cambia con el idioma, así que un
+  //  jugador en inglés mandaría "Cone of Cold" y acá no matchearía nada.
+  //
+  //  ⚠ "perforacion" NO ESTÁ, y es a propósito: es la receta inicial, conocida
+  //  sin comprar. Sin al menos una, un jugador nuevo nunca ve un Único y la
+  //  mecánica de fusión le resulta invisible. Lo que no está en esta lista no se
+  //  vende, y `POST /tienda/plano` contesta `plano_desconocido`.
+  // ---------------------------------------------------------------------------
+  "version": 1,
+
+  // ⚠ TODOS AL MISMO PRECIO, a propósito. Los nueve Únicos no son mejores unos
+  // que otros —son para clases distintas—, así que un precio escalonado
+  // inventaría una jerarquía que el balance no tiene y empujaría a comprar «el
+  // barato primero» en vez de «el de la clase que juego». La decisión que la
+  // tienda tiene que hacer interesante es CUÁL, no en qué orden.
+  //
+  // El número sale del oro que deja una corrida (ver economia.json): una que
+  // llega a la 65 deja ~2.100 y una ganada deja 10.000. A 4.000 cada uno, los
+  // ocho salen 32.000 — del orden de quince corridas buenas o tres ganadas.
+  // Es caro a propósito: el techo se alcanza igual porque la lista es finita, y
+  // lo único que se elige acá es cuánto tarda.
+  "planos": [
+    { "key": "ondaDeFrio",     "precio": 4000 },
+    { "key": "iraDeDios",      "precio": 4000 },
+    { "key": "apocalipsis",    "precio": 4000 },
+    { "key": "terribleHambre", "precio": 4000 },
+    { "key": "tormentaDivina", "precio": 4000 },
+    { "key": "ceguera",        "precio": 4000 },
+    { "key": "fuerza",         "precio": 4000 },
+    { "key": "invisibilidad",  "precio": 4000 }
+  ]
+}

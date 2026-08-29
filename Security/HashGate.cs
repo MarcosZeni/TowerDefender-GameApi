@@ -38,7 +38,7 @@ public sealed class HashGate : IDisposable
 
     public int MaxConcurrent { get; }
 
-    public HashGate(ConfigSeguridad config)
+    public HashGate(SecurityConfig config)
     {
         MaxConcurrent = config.MaxConcurrentHashes > 0
             ? config.MaxConcurrentHashes
@@ -50,7 +50,7 @@ public sealed class HashGate : IDisposable
 
     /// <summary>Techo de memoria en MB, para poder loguearlo al arrancar y que
     /// el número esté a la vista en vez de ser una sorpresa en producción.</summary>
-    public int MemoryCeilingMb(ConfigSeguridad config)
+    public int MemoryCeilingMb(SecurityConfig config)
         => (int)((long)MaxConcurrent * config.Argon2MemoryKib / 1024);
 
     /// <summary>

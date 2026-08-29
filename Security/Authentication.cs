@@ -15,7 +15,7 @@ namespace TowerOfArgentum.Api.Security;
 /// <see cref="LoginToken.HashOf"/> → lookup por PK → chequeo de
 /// <c>expira</c>.</para>
 /// </remarks>
-public static class Autenticacion
+public static class Authentication
 {
     private const string Encabezado = "Authorization";
     private const string Prefijo = "Bearer ";
@@ -23,7 +23,7 @@ public static class Autenticacion
     /// <summary>
     /// Saca el token del header. <c>null</c> si no está o no tiene forma válida.
     /// </summary>
-    public static string? TokenDe(HttpContext http)
+    public static string? TokenOf(HttpContext http)
     {
         string? crudo = http.Request.Headers[Encabezado];
 
@@ -49,9 +49,9 @@ public static class Autenticacion
     /// tocar la base. Sin eso, cualquiera puede hacer que la API consulte MySQL
     /// mandando basura en un header.
     /// </remarks>
-    public static async Task<long?> CuentaDeAsync(HttpContext http, TokenRepositorio tokens, CancellationToken ct)
+    public static async Task<long?> AccountOfAsync(HttpContext http, TokenRepository tokens, CancellationToken ct)
     {
-        string? plano = TokenDe(http);
+        string? plano = TokenOf(http);
         if (plano is null)
             return null;
 
@@ -59,6 +59,6 @@ public static class Autenticacion
         if (hash is null)
             return null;
 
-        return await tokens.CanjearAsync(hash, ct);
+        return await tokens.RedeemAsync(hash, ct);
     }
 }
