@@ -39,6 +39,25 @@ builder.Configuration.AddEnvironmentVariables("ASPNETCORE_");
 
 builder.Configuration.AddCommandLine(args);
 
+// -----------------------------------------------------------------------------
+// El PORT de los hostings.
+//
+// Railway, Render y compañía no setean ASPNETCORE_URLS: reparten un PORT pelado
+// y esperan que la app escuche en 0.0.0.0 en ese puerto. Sin este puente, la API
+// arranca "bien" en el 127.0.0.1:5090 de appsettings, el health del hosting no
+// llega nunca y el deploy queda ciclando en unhealthy — sin un solo error en el
+// log, que es el peor síntoma posible.
+//
+// ASPNETCORE_URLS explícita le gana: si alguien la puso, sabe lo que quiere.
+// -----------------------------------------------------------------------------
+string? puertoHosting = Environment.GetEnvironmentVariable("PORT");
+
+if (!string.IsNullOrWhiteSpace(puertoHosting) &&
+    string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{puertoHosting}");
+}
+
 var config = builder.Configuration.Get<ApiConfig>() ?? new ApiConfig();
 
 string connectionString = builder.Configuration.GetConnectionString("Default")
@@ -50,6 +69,31 @@ if (string.IsNullOrWhiteSpace(connectionString))
         "Falta la cadena de conexión: poné ConnectionStrings:Default en appsettings.Local.json " +
         "o la variable de entorno ConnectionStrings__Default.");
 }
+
+// -----------------------------------------------------------------------------
+// La cadena de conexión también entra como URL: MYSQL_URL o DATABASE_URL.
+//
+// Es el formato que reparten los hostings —Railway, Render, Heroku—:
+//
+//     mysql://usuario:contraseña@host:puerto/base
+//
+// y tiene prioridad sobre ConnectionStrings, porque si la variable está puesta
+// en el hosting es porque ahí vive la base de ese despliegue. El formato ADO
+// clásico (Server=...;Port=...) sigue andando igual que siempre por
+// ConnectionStrings__Default.
+//
+// ⚠ La contraseña con caracteres raros va PERCENT-ENCODED en la URL: una '@' o
+//   una '/' crudas parten el parseo por la mitad. '$' y '!' pasan sin codificar.
+//
+// Se aceptan opciones extra como query string —?sslMode=Required— y se pasan tal
+// cual a MySqlConnector. Para una base del otro lado de internet, sslMode va
+// puesto: sin TLS el tramo API→MySQL viaja legible, igual que un token sin HTTPS.
+// -----------------------------------------------------------------------------
+string? mysqlUrl = builder.Configuration["MYSQL_URL"] ?? builder.Configuration["DATABASE_URL"];
+
+if (!string.IsNullOrWhiteSpace(mysqlUrl))
+    connectionString = ConnectionStringFromUrl(mysqlUrl);
+
 
 // -----------------------------------------------------------------------------
 // Los números del juego
@@ -222,6 +266,91 @@ else if (schema.Problems.Count > 0)
 
 app.Run();
 return 0;
+
+
+/// <summary>
+/// Convierte <c>mysql://usuario:contraseña@host:puerto/base?opcion=valor</c> al
+/// formato ADO que entiende MySqlConnector.
+/// </summary>
+/// <remarks>
+/// <para>Los pedazos de la URL se decodifican con
+/// <see cref="Uri.UnescapeDataString"/> —una contraseña con <c>@</c> o <c>/</c>
+/// tiene que venir percent-encoded— y se arman con
+/// <c>MySqlConnectionStringBuilder</c>, que escapa solo: concatenar a mano
+/// rompería con cualquier contraseña que traiga <c>;</c> o comillas.</para>
+///
+/// <para>El charset queda clavado en <c>utf8mb4</c>, la misma decisión que toda
+/// la base. Las opciones del query string se pasan tal cual al builder: una clave
+/// que MySqlConnector no conoce corta el arranque con el nombre en el error, que
+/// es mil veces mejor que ignorarla en silencio y descubrir en producción que
+/// <c>sslMode</c> estaba escrito mal y el tramo viajaba en claro.</para>
+/// </remarks>
+static string ConnectionStringFromUrl(string url)
+{
+    Uri uri;
+
+    try
+    {
+        uri = new Uri(url);
+    }
+    catch (UriFormatException e)
+    {
+        throw new InvalidOperationException(
+            $"MYSQL_URL no es una URL válida: {e.Message}. La forma es " +
+            "mysql://usuario:contraseña@host:puerto/base (contraseña percent-encoded).");
+    }
+
+    if (uri.Scheme is not ("mysql" or "mariadb"))
+        throw new InvalidOperationException(
+            $"MYSQL_URL tiene el esquema '{uri.Scheme}' y se esperaba 'mysql://'.");
+
+    var bd = new MySqlConnectionStringBuilder
+    {
+        Server = uri.Host,
+        Port = uri.Port > 0 ? (uint)uri.Port : 3306,
+        Database = uri.AbsolutePath.Trim('/'),
+        CharacterSet = "utf8mb4",
+    };
+
+    if (uri.UserInfo.Length > 0)
+    {
+        // Split en el PRIMER ':' — la contraseña puede traer más de uno.
+        int sep = uri.UserInfo.IndexOf(':');
+
+        bd.UserID = Uri.UnescapeDataString(sep < 0 ? uri.UserInfo : uri.UserInfo[..sep]);
+
+        if (sep >= 0)
+            bd.Password = Uri.UnescapeDataString(uri.UserInfo[(sep + 1)..]);
+    }
+
+    if (bd.Database.Length == 0)
+        throw new InvalidOperationException(
+            "MYSQL_URL no trae la base: la forma es mysql://usuario:contraseña@host:puerto/base.");
+
+    // Las opciones extra: ?sslMode=Required&connectionTimeout=15
+    foreach (string par in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+    {
+        int igual = par.IndexOf('=');
+
+        if (igual <= 0)
+            continue;
+
+        string clave = Uri.UnescapeDataString(par[..igual]);
+        string valor = Uri.UnescapeDataString(par[(igual + 1)..]);
+
+        try
+        {
+            bd[clave] = valor;
+        }
+        catch (Exception e) when (e is ArgumentException or FormatException)
+        {
+            throw new InvalidOperationException(
+                $"MYSQL_URL trae la opción '{clave}={valor}' y MySqlConnector no la acepta: {e.Message}");
+        }
+    }
+
+    return bd.ConnectionString;
+}
 
 /// <summary>Marcador para <c>ILogger&lt;Program&gt;</c> con top-level statements.</summary>
 public partial class Program;

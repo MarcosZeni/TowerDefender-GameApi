@@ -31,6 +31,12 @@ public sealed class SchemaCheck(Database db)
         ("runs", ["id", "id_cuenta", "seed", "gano", "oleada", "ticks",
                   "motivo_cierre", "datos_version", "log_acciones", "validado"], "003_runs.sql"),
 
+        // Las tres columnas del progreso guardado van en su propia entrada y no
+        // sumadas a la de arriba, para que el mensaje de arranque nombre la
+        // migración 006 y no la 003: quien tenga la base vieja necesita correr
+        // esa, no la que ya corrió.
+        ("runs", ["tick_guardado", "actualizada", "plataforma"], "006_runs_progreso.sql"),
+
         ("planos_cuenta", ["id_cuenta", "plano", "precio"], "004_planos_cuenta.sql"),
         ("intentos_login", ["ip", "nick", "exito", "cuando"], "005_intentos_login.sql"),
     ];

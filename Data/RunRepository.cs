@@ -16,6 +16,24 @@ public sealed record RankingRow(
 /// <summary>Una corrida abierta.</summary>
 public sealed record OpenRun(long Id, ulong Seed, int DataVersion);
 
+/// <summary>Una corrida abierta con su punto de reanudación.</summary>
+/// <remarks>
+/// El <c>Log</c> es el mismo blob que escribe <c>SaveFile</c>: con la seed y el
+/// tick alcanza para reconstruir el estado exacto re-simulando.
+/// </remarks>
+public sealed record SavedRun(
+    long Id,
+    ulong Seed,
+    int DataVersion,
+    int Wave,
+    int Area,
+    int Ticks,
+    int SavedTick,
+    byte[]? Log,
+    bool LogTruncated,
+    string Platform,
+    System.DateTime? UpdatedUtc);
+
 /// <summary>
 /// Consultas sobre <c>runs</c>.
 /// </summary>
@@ -36,7 +54,7 @@ public sealed class RunRepository(Database db)
     /// perdida.</para>
     /// </remarks>
     public async Task<(long IdNueva, long? IdAbandonada)> AbrirAsync(
-        long idCuenta, ulong seed, int datosVersion, CancellationToken ct)
+        long idCuenta, ulong seed, int datosVersion, string plataforma, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -71,13 +89,19 @@ public sealed class RunRepository(Database db)
 
         await using (var abrir = new MySqlCommand(
             """
-            INSERT INTO runs (id_cuenta, seed, datos_version, iniciada)
-            VALUES (@cuenta, @seed, @version, UTC_TIMESTAMP(3))
+            INSERT INTO runs (id_cuenta, seed, datos_version, plataforma, iniciada)
+            VALUES (@cuenta, @seed, @version, @plataforma, UTC_TIMESTAMP(3))
             """, conn, tx))
         {
             abrir.Parameters.AddWithValue("@cuenta", idCuenta);
             abrir.Parameters.AddWithValue("@seed", seed);
             abrir.Parameters.AddWithValue("@version", datosVersion);
+
+            // ⚠ Es una DECLARACIÓN del cliente y no se puede verificar nunca: el
+            // área, la oleada y los ticks se re-derivan de la seed más el log; la
+            // plataforma no sale de ahí. Se guarda para poder medir si el control
+            // táctil pesa en una tabla ordenada por velocidad, no para premiar.
+            abrir.Parameters.AddWithValue("@plataforma", plataforma);
 
             await abrir.ExecuteNonQueryAsync(ct);
             idNueva = abrir.LastInsertedId;
@@ -150,6 +174,110 @@ public sealed class RunRepository(Database db)
         cmd.Parameters.AddWithValue("@truncado", logTruncado ? 1 : 0);
 
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>
+    /// Guarda el progreso de la corrida abierta: log, tick y hasta dónde llegó.
+    /// </summary>
+    /// <remarks>
+    /// <para>Es el mismo trío que escribe <c>SaveFile</c> del lado del cliente
+    /// —seed, log de acciones y tick—, con la seed ya en la fila desde
+    /// <c>/run/start</c>. No hay estado serializado: cargar es re-simular.</para>
+    ///
+    /// <para>⚠ <b>El progreso NUNCA retrocede.</b> La condición
+    /// <c>@ticks >= ticks</c> va en el <c>WHERE</c>, así que la decide MySQL y no
+    /// hay ventana entre leer y escribir. Sin eso, un celular que quedó abierto
+    /// en la oleada 12 sube su estado viejo encima de la 60 de la PC y le
+    /// rebobina la corrida al jugador. Con la guarda, dos dispositivos a la vez
+    /// se pisan —cada uno le gana al otro— pero <b>nunca hacia atrás</b>: lo peor
+    /// que pasa es perder las jugadas del que iba más atrasado.</para>
+    ///
+    /// <para>⚠ <c>validado</c> no se toca, igual que en <see cref="CloseAsync"/>.
+    /// Un checkpoint es un reclamo como cualquier otro — con la diferencia de que
+    /// este trae el log, así que <b>sí</b> se puede revalidar.</para>
+    /// </remarks>
+    /// <returns><c>false</c> si no hay corrida abierta con ese id, o si el progreso iba para atrás.</returns>
+    public async Task<bool> SaveProgressAsync(
+        long idRun, long idCuenta, int oleada, int area, int ticks, int tickGuardado,
+        byte[]? log, bool logTruncado, CancellationToken ct)
+    {
+        await using var conn = await db.OpenAsync(ct);
+
+        await using var cmd = new MySqlCommand(
+            """
+            UPDATE runs SET
+                oleada        = @oleada,
+                area          = @area,
+                ticks         = @ticks,
+                tick_guardado = @tick,
+                log_acciones  = @log,
+                log_truncado  = @truncado,
+                actualizada   = UTC_TIMESTAMP(3)
+            WHERE id = @id
+              AND id_cuenta = @cuenta
+              AND motivo_cierre IS NULL
+              AND @ticks >= ticks
+            """, conn);
+
+        cmd.Parameters.AddWithValue("@id", idRun);
+        cmd.Parameters.AddWithValue("@cuenta", idCuenta);
+        cmd.Parameters.AddWithValue("@oleada", oleada);
+        cmd.Parameters.AddWithValue("@area", area);
+        cmd.Parameters.AddWithValue("@ticks", ticks);
+        cmd.Parameters.AddWithValue("@tick", tickGuardado);
+        cmd.Parameters.AddWithValue("@log", (object?)log ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@truncado", logTruncado ? 1 : 0);
+
+        return await cmd.ExecuteNonQueryAsync(ct) > 0;
+    }
+
+    /// <summary>
+    /// La corrida abierta de una cuenta, con todo lo que hace falta para retomarla.
+    /// </summary>
+    /// <remarks>
+    /// <para>Es lo que hace que la corrida de la PC se siga en el celular: la
+    /// seed más el log más el tick reconstruyen el estado exacto, porque la
+    /// simulación es determinista y va <b>toda en enteros</b> con PRNG propio. Un
+    /// solo <c>double</c> adentro del tick y ARM y x86 divergirían; esa regla se
+    /// escribió para el anticheat y acá se cobra sola.</para>
+    ///
+    /// <para>Devuelve <c>datos_version</c> para que el cliente pueda negarse a
+    /// reproducir con otros números: un guardado es un log que se re-simula, así
+    /// que <b>solo vale contra los mismos datos con los que se jugó</b>. Es la
+    /// misma regla que ya rige el ranking por temporadas.</para>
+    /// </remarks>
+    public async Task<SavedRun?> FindCurrentAsync(long idCuenta, CancellationToken ct)
+    {
+        await using var conn = await db.OpenAsync(ct);
+
+        await using var cmd = new MySqlCommand(
+            """
+            SELECT id, seed, datos_version, oleada, area, ticks, tick_guardado,
+                   log_acciones, log_truncado, plataforma, actualizada
+            FROM runs
+            WHERE id_cuenta = @cuenta AND motivo_cierre IS NULL
+            LIMIT 1
+            """, conn);
+
+        cmd.Parameters.AddWithValue("@cuenta", idCuenta);
+
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+
+        if (!await r.ReadAsync(ct))
+            return null;
+
+        return new SavedRun(
+            Id: r.GetInt64(0),
+            Seed: r.GetUInt64(1),
+            DataVersion: r.GetInt32(2),
+            Wave: r.GetInt32(3),
+            Area: r.GetInt32(4),
+            Ticks: r.GetInt32(5),
+            SavedTick: r.GetInt32(6),
+            Log: r.IsDBNull(7) ? null : (byte[])r.GetValue(7),
+            LogTruncated: !r.IsDBNull(8) && r.GetInt32(8) != 0,
+            Platform: r.IsDBNull(9) ? "pc" : r.GetString(9),
+            UpdatedUtc: r.IsDBNull(10) ? null : r.GetDateTime(10));
     }
 
     /// <summary>

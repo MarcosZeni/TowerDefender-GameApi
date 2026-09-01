@@ -1,0 +1,12 @@
+# Lo que no tiene que entrar al contexto del build de Docker.
+#
+# bin/ y obj/ porque la imagen compila desde el fuente — un obj/ de Windows
+# adentro del build de Linux es basura que además rompe la caché en cada build.
+# appsettings.Local.json porque son las credenciales de ESTA máquina: al hosting
+# la conexión le llega por MYSQL_URL, nunca horneada en la imagen.
+bin/
+obj/
+appsettings.Local.json
+*.md
+.git/
+.gitignore

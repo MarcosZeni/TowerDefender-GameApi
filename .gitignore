@@ -461,3 +461,8 @@ appsettings.*.Local.json
 *.sql.bak
 dump_*.sql
 backup_*.sql
+
+# El alta del hosting lleva la CONTRASEÑA REAL del usuario de la API adentro.
+# No se versiona por lo mismo que appsettings.Local.json: un secreto commiteado
+# queda en el historial para siempre, aunque después se borre el archivo.
+sql/hosting_setup.sql
