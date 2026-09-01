@@ -23,17 +23,29 @@ public sealed class Database(string connectionString)
     /// <summary>Ping para el <c>/health</c>: que la API conteste "ok" sin saber
     /// si la base está viva no le sirve a nadie.</summary>
     public async Task<bool> CanConnectAsync(CancellationToken ct)
+        => (await ProbeAsync(ct)).Ok;
+
+    /// <summary>
+    /// El mismo ping, pero devolviendo <b>por qué</b> falló.
+    ///
+    /// ⚠ El motivo va al log, NUNCA al cuerpo de la respuesta: el mensaje de
+    /// MySqlConnector nombra el host, el puerto y el usuario, y <c>/health</c>
+    /// es público y sin token. Existe porque "baseDatos: caida" a secas manda a
+    /// adivinar entre firewall, credenciales, SSL y base inexistente, que son
+    /// cuatro arreglos distintos.
+    /// </summary>
+    public async Task<(bool Ok, string? Error)> ProbeAsync(CancellationToken ct)
     {
         try
         {
             await using var conn = await OpenAsync(ct);
             await using var cmd = new MySqlCommand("SELECT 1", conn);
             await cmd.ExecuteScalarAsync(ct);
-            return true;
+            return (true, null);
         }
-        catch (MySqlException)
+        catch (MySqlException e)
         {
-            return false;
+            return (false, $"[{e.ErrorCode}] {e.Message}");
         }
     }
 }

@@ -197,9 +197,16 @@ app.MapProfile();
 
 // El launcher y el monitoreo preguntan acá. Contestar "ok" sin saber si la base
 // está viva no le sirve a nadie, así que se la pinguea.
-app.MapGet("/health", async (Database db, ApiConfig cfg, CancellationToken ct) =>
+app.MapGet("/health", async (
+    Database db, ApiConfig cfg, ILogger<Program> logSalud, CancellationToken ct) =>
 {
-    bool baseOk = await db.CanConnectAsync(ct);
+    var (baseOk, error) = await db.ProbeAsync(ct);
+
+    // El motivo al log y no a la respuesta: /health es público y sin token, y el
+    // mensaje de MySqlConnector nombra host, puerto y usuario.
+    if (!baseOk)
+        logSalud.LogError("/health: la base no responde. {Error}", error);
+
     return Results.Json(new
     {
         estado = baseOk ? "ok" : "degradado",
