@@ -60,16 +60,6 @@ if (!string.IsNullOrWhiteSpace(puertoHosting) &&
 
 var config = builder.Configuration.Get<ApiConfig>() ?? new ApiConfig();
 
-string connectionString = builder.Configuration.GetConnectionString("Default")
-                          ?? config.ConnectionString;
-
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    throw new InvalidOperationException(
-        "Falta la cadena de conexión: poné ConnectionStrings:Default en appsettings.Local.json " +
-        "o la variable de entorno ConnectionStrings__Default.");
-}
-
 // -----------------------------------------------------------------------------
 // La cadena de conexión también entra como URL: MYSQL_URL o DATABASE_URL.
 //
@@ -89,10 +79,27 @@ if (string.IsNullOrWhiteSpace(connectionString))
 // cual a MySqlConnector. Para una base del otro lado de internet, sslMode va
 // puesto: sin TLS el tramo API→MySQL viaja legible, igual que un token sin HTTPS.
 // -----------------------------------------------------------------------------
+// ⚠ ESTE BLOQUE VA ANTES DEL GUARDIA DE ABAJO, y estuvo mal justo al revés.
+//
+// Con el guardia primero, en un hosting sin appsettings.Local.json —o sea, en
+// cualquier hosting— la cadena venía vacía, el throw saltaba, y MYSQL_URL no se
+// leía nunca: el contenedor moría en bucle diciendo "poné ConnectionStrings",
+// que es exactamente la variable que NO hay que poner ahí. En la máquina de
+// desarrollo no se notaba, porque el Local llenaba la cadena antes de llegar.
 string? mysqlUrl = builder.Configuration["MYSQL_URL"] ?? builder.Configuration["DATABASE_URL"];
 
-if (!string.IsNullOrWhiteSpace(mysqlUrl))
-    connectionString = ConnectionStringFromUrl(mysqlUrl);
+string connectionString = !string.IsNullOrWhiteSpace(mysqlUrl)
+    ? ConnectionStringFromUrl(mysqlUrl)
+    : builder.Configuration.GetConnectionString("Default") ?? config.ConnectionString;
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Falta la cadena de conexión. En un hosting: la variable MYSQL_URL con " +
+        "mysql://usuario:contraseña@host:puerto/base. En desarrollo: " +
+        "ConnectionStrings:Default en appsettings.Local.json, o la variable de " +
+        "entorno ConnectionStrings__Default.");
+}
 
 
 // -----------------------------------------------------------------------------
