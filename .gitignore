@@ -466,3 +466,10 @@ backup_*.sql
 # No se versiona por lo mismo que appsettings.Local.json: un secreto commiteado
 # queda en el historial para siempre, aunque después se borre el archivo.
 sql/hosting_setup.sql
+
+# La plantilla de VS ignora *.nupkg (línea de arriba), y está bien para los que
+# genera el build. El de paquetes es distinto: es la DEPENDENCIA de la
+# simulación, y viaja versionada dentro del repo para que un clon suelto
+# (Railway) compile sin la carpeta hermana. Sin esta excepción, el COPY del
+# Dockerfile muere con "/paquetes: not found" en el primer deploy.
+!paquetes/*.nupkg
