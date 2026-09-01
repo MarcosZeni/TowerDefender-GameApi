@@ -29,6 +29,10 @@ WORKDIR /src
 # rehace solo cuando cambian el .csproj, el nuget.config o el paquete local.
 COPY TowerOfArgentum.Api.csproj nuget.config ./
 COPY paquetes/ paquetes/
+# La fuente "local" de nuget.config apunta a la carpeta hermana (../paquetes),
+# que en el clon del hosting no existe — y NuGet corta el restore entero por una
+# fuente local ausente. Se crea vacía: el paquete real ya está en paquetes/.
+RUN mkdir -p /paquetes
 RUN dotnet restore
 
 COPY . .
