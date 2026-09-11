@@ -81,6 +81,11 @@ CREATE TABLE IF NOT EXISTS `runs` (
   `log_formato` tinyint unsigned NOT NULL DEFAULT '1',
   `log_truncado` tinyint unsigned NOT NULL DEFAULT '0',
   `log_acciones` mediumblob,
+  -- 0 = pendiente (lo que escribe /run/finish: lo del cliente es un reclamo, no
+  -- un hecho), 1 = la re-simulacion coincide, 2 = no coincide, 3 = el log no se
+  -- puede leer. El 3 existe para SACAR la fila de la cola: sin el, una fila con
+  -- el blob cortado o vacio se queda en 0 y el revalidador la vuelve a tomar en
+  -- cada lote, para siempre. No es lo mismo que un 2: el 2 acusa al jugador.
   `validado` tinyint unsigned NOT NULL DEFAULT '0',
   `iniciada` datetime(3) NOT NULL,
   `terminada` datetime(3) DEFAULT NULL,

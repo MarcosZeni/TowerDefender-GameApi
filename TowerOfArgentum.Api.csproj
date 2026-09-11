@@ -44,7 +44,12 @@
          ⚠ Si falla la restauración, correr una vez, en el repo del cliente:
              cd Client/Simulation
              dotnet pack -c Release -->
-    <PackageReference Include="TowerOfArgentum.Simulation" Version="0.1.0" />
+    <!-- ⚠ Este número tiene que seguir al <Version> del csproj de la simulación.
+         Que se separen no rompe la compilación: el servidor revalida con una
+         simulación VIEJA y le da otro resultado que el cliente, o sea que acusa
+         de trampa a quien no hizo nada. Pasó: quedó en 0.1.0 del 2026-09-01
+         mientras el cliente cambiaba Fuse, el ritmo de áreas y las sinergias. -->
+    <PackageReference Include="TowerOfArgentum.Simulation" Version="0.2.0" />
   </ItemGroup>
 
   <!-- ⚠ Lo que NO se referencia, y es deliberado (CLAUDE.md):

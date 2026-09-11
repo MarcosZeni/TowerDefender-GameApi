@@ -52,15 +52,38 @@ public sealed class Revalidator(Database db, ServerData datos)
 
         if (blob is null || blob.Length == 0)
         {
+            // ⚠ Se marca ILEGIBLE y no se deja en 0. Una fila que vuelve sin
+            // marcar la toma otra vez el lote siguiente, y el siguiente: un log
+            // que no se lee hoy no se va a leer mañana, así que sin esto
+            // `RevalidatePendingAsync` re-simula las mismas filas para siempre.
+            await MarcarIlegibleAsync(idRun, ct);
+
             return new RevalidationResult(
                 idRun, false, "sin log: no se puede revalidar",
                 ticksReclamados, 0, oleadaReclamada, 0);
         }
 
-        var log = BinaryLog.Read(blob);
+        ActionLog log;
+
+        try
+        {
+            log = BinaryLog.Read(blob);
+        }
+        catch (Exception ex)
+        {
+            // El blob puede venir cortado por `maxLogBytes`, que parte el stream
+            // Deflate al medio: `Read` tira, no devuelve un log corto.
+            await MarcarIlegibleAsync(idRun, ct);
+
+            return new RevalidationResult(
+                idRun, false, $"el log no se pudo leer ({ex.Message})",
+                ticksReclamados, 0, oleadaReclamada, 0);
+        }
 
         if (log.Count == 0)
         {
+            await MarcarIlegibleAsync(idRun, ct);
+
             return new RevalidationResult(
                 idRun, false, "el log no se pudo leer o está vacío",
                 ticksReclamados, 0, oleadaReclamada, 0);
@@ -79,20 +102,51 @@ public sealed class Revalidator(Database db, ServerData datos)
         var partida = new Run(seed, mapa, log, balance);
         partida.Start();
 
+        // ⚠ Los mismos DOS cortes que `SaveFile.Rebuild` del cliente, y por el
+        // mismo motivo. `MaxRevalidationTicks` acota el reloj, pero el reloj es
+        // justo lo que se congela en una pausa: un log que termina en la pantalla
+        // de preparación —o que diverge y deja acciones sin consumir— deja este
+        // `while` girando para siempre, y el que se cuelga acá es el proceso del
+        // servidor. Un cuelgue mudo es mucho más caro de diagnosticar que una
+        // corrida marcada como no coincidente.
+        string? trabado = null;
+
         while (partida.State == RunState.InProgress &&
                partida.Tick < datos.Limits.MaxRevalidationTicks)
+        {
+            if (partida.WaitsForPlayer)
+            {
+                trabado = $"el log se quedó esperando al jugador en el tick {partida.Tick} " +
+                          $"(acción {partida.LogCursor} de {log.Count})";
+                break;
+            }
+
+            int tickPrevio = partida.Tick;
+            int cursorPrevio = partida.LogCursor;
+
             partida.Advance();
+
+            // Una vuelta que no movió ni el reloj ni el cursor no va a mover nada.
+            if (partida.Tick == tickPrevio && partida.LogCursor == cursorPrevio)
+            {
+                trabado = $"la re-simulación se trabó en el tick {partida.Tick} " +
+                          $"(acción {partida.LogCursor} de {log.Count}, en pausa {partida.Paused})";
+                break;
+            }
+        }
 
         bool ganoReal = partida.State == RunState.Won;
 
         bool coincide =
+            trabado is null &&
             partida.Tick == ticksReclamados &&
             partida.Wave == oleadaReclamada &&
             ganoReal == ganoReclamado;
 
         string detalle = coincide
             ? "coincide"
-            : $"reclamó oleada {oleadaReclamada} en {ticksReclamados} ticks " +
+            : trabado ??
+              $"reclamó oleada {oleadaReclamada} en {ticksReclamados} ticks " +
               $"(gano={ganoReclamado}); la re-simulación da oleada {partida.Wave} " +
               $"en {partida.Tick} ticks (gano={ganoReal})";
 
@@ -179,6 +233,22 @@ public sealed class Revalidator(Database db, ServerData datos)
     /// mismas corridas fallidas para siempre.
     /// </remarks>
     private async Task MarcarAsync(long idRun, bool coincide, CancellationToken ct)
+        => await EscribirValidadoAsync(idRun, coincide ? 1 : 2, ct);
+
+    /// <summary>
+    /// Marca la corrida como ILEGIBLE: el log no se puede leer, ni siquiera para
+    /// decir si coincide.
+    /// </summary>
+    /// <remarks>
+    /// ⚠ Es un valor propio (3) y no un 2. Un 2 dice «re-simulé y no da», que es
+    /// una acusación; esto dice «no hay nada que re-simular», que es un problema
+    /// de datos y no del jugador. Y sobre todo saca la fila de la cola: dejarla
+    /// en 0 la devuelve al lote siguiente, para siempre.
+    /// </remarks>
+    private async Task MarcarIlegibleAsync(long idRun, CancellationToken ct)
+        => await EscribirValidadoAsync(idRun, 3, ct);
+
+    private async Task EscribirValidadoAsync(long idRun, int validado, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
@@ -186,7 +256,7 @@ public sealed class Revalidator(Database db, ServerData datos)
             "UPDATE runs SET validado = @v WHERE id = @id", conn);
 
         cmd.Parameters.AddWithValue("@id", idRun);
-        cmd.Parameters.AddWithValue("@v", coincide ? 1 : 2);
+        cmd.Parameters.AddWithValue("@v", validado);
 
         await cmd.ExecuteNonQueryAsync(ct);
     }
