@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS `runs` (
   `ticks` int unsigned NOT NULL DEFAULT '0',
   `motivo_cierre` enum('perdio','gano','abandono') DEFAULT NULL,
   `datos_version` smallint unsigned NOT NULL DEFAULT '1',
+  `datos_hash` char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
   `log_formato` tinyint unsigned NOT NULL DEFAULT '1',
   `log_truncado` tinyint unsigned NOT NULL DEFAULT '0',
   `log_acciones` mediumblob,
