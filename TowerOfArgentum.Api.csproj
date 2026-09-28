@@ -28,6 +28,7 @@
        de cada número comentado al lado. Ver Config\ServerData.cs. -->
   <ItemGroup>
     <Content Update="GameData\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="SimulationData\**\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
