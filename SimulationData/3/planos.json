@@ -1,0 +1,66 @@
+{
+  // ---------------------------------------------------------------------------
+  //  Los planos de fusión: dos perks de Oro se consumen y sale un Único.
+  //
+  //  ⚠ EL ÚNICO OCUPA UN SOLO SLOT. El slot liberado es la mitad del premio.
+  //
+  //  El plano se compra UNA VEZ, con la billetera, desde el menú principal, y
+  //  queda aprendido para siempre en esa cuenta. Junto con la billetera, es la
+  //  ÚNICA PROGRESIÓN PERMANENTE DEL PROYECTO: todo lo demás muere con la corrida.
+  //
+  //  ⚠ LA LISTA ES FINITA, Y ESA ES LA REGLA. Es la condición que hace tolerable
+  //  la ventaja del veterano: tiene techo. Por eso no se agrega equipo permanente
+  //  ni nada que escale sin fin. Agregar planos sin freno rompe esa promesa.
+  //
+  //  ⚠ Entra al hash de /run/start. Tocar esto es TEMPORADA NUEVA.
+  //
+  //  ⚠ "version" es el MISMO número en los ocho del hash; el que el cargador lee
+  //  de verdad es el de enemigos.json.
+  // ---------------------------------------------------------------------------
+  "version": 3,
+
+  // Se referencian por la "key" de perks.json y NO por id: un id pegado a mano
+  // quedaría apuntando a otro perk en cuanto alguien agregue uno, y el síntoma
+  // sería una fusión que produce algo que no es. Tampoco por nombre, que ahora
+  // vive en los archivos de idioma y cambia con el idioma.
+  //
+  // El nombre del plano que ve el jugador es el del único que produce:
+  // «perk.<key>.name» en Data\lang\.
+  //
+  // "goldA" y "goldB" tienen que ser de tier gold; "key" tiene que ser un tier
+  // unique. El orden de goldA/goldB no importa al fusionar — el validador
+  // (--validar) chequea las tres cosas.
+  //
+  // "initial": true = se sabe sin comprar nada.
+  // ⚠ Tiene que haber AL MENOS UNA inicial. Sin eso un jugador nuevo nunca ve un
+  // Único y la fusión —la salida de los Oro repetidos— le resulta invisible
+  // hasta que gasta oro en algo que no entiende para qué sirve.
+  // ⚠ LAS RECETAS SE REESCRIBIERON ENTERAS EN Planos_v2, y el criterio cambió.
+  //
+  // Antes los componentes eran los dos Oro que la clase podía equipar, sin más:
+  // Perforación salía de Ricochet + Golpe Certero porque el Cazador tiene los
+  // dos, no porque el Único se pareciera a ninguno. El resultado era que el
+  // nombre del Único no decía nada de la receta y la fusión era una tabla que
+  // había que memorizar.
+  //
+  // Ahora CADA ÚNICO ES LA COMBINACIÓN REAL DE SUS DOS COMPONENTES, con las
+  // magnitudes rebajadas: Onda de Frío hace splash Y ralentiza porque sale de
+  // Onda Expansiva + Escarcha. La receta se puede adivinar mirando el efecto, y
+  // eso convierte a los Únicos en un objetivo de build en vez de una lotería.
+  //
+  // ⚠ Los componentes NO tienen que ser equipables por la clase del Único: se
+  // consumen de la MOCHILA. Pero sí tienen que poder CAER en una corrida de esa
+  // clase, o la receta es inalcanzable — por eso «sobrepenetracion» lleva Thief
+  // en su lista de clases aunque el Ladrón nunca lo equipe suelto.
+  "blueprints": [
+    { "key": "perforacion",    "goldA": "concentracion",    "goldB": "sobrepenetracion", "initial": true  },
+    { "key": "ondaDeFrio",     "goldA": "escarcha",         "goldB": "ondaExpansiva",    "initial": false },
+    { "key": "iraDeDios",      "goldA": "guardiaDelUmbral", "goldB": "quebranto",        "initial": false },
+    { "key": "apocalipsis",    "goldA": "hemorragia",       "goldB": "oportunista",      "initial": false },
+    { "key": "terribleHambre", "goldA": "raices",           "goldB": "tormentaDeFuego",  "initial": false },
+    { "key": "tormentaDivina", "goldA": "inspiracion",      "goldB": "quebranto",        "initial": false },
+    { "key": "ceguera",        "goldA": "inspiracion",      "goldB": "debilidad",        "initial": false },
+    { "key": "fuerza",         "goldA": "golpeSismico",     "goldB": "quebranto",        "initial": false },
+    { "key": "invisibilidad",  "goldA": "saqueo",           "goldB": "sobrepenetracion", "initial": false }
+  ]
+}
