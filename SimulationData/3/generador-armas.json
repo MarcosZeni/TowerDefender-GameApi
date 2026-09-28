@@ -1,0 +1,136 @@
+{
+  // ---------------------------------------------------------------------------
+  //  El generador de armas. El arma es el ÚNICO ítem con stats del juego.
+  //
+  //  ⚠ Armadura, casco y escudo NO DAN NADA: son el frame que cambia cuando la
+  //  clase sube de nivel. Todo el poder del equipo vive en el arma.
+  //
+  //  ⚠ ESTO NO ES "armas.json", Y ESA DISTINCIÓN IMPORTA. DATOS.md §2 prohíbe
+  //  armas.json / escudos.json / cascos.json: son un catálogo de ÍTEMS, que
+  //  existe en Austral porque su muñeco se compone por capas. Acá un defensor es
+  //  un sprite. Este archivo no lista ítems —las armas se GENERAN— sino los
+  //  parámetros del generador.
+  //
+  //  ⚠ ACÁ TAMPOCO HAY TEXTO PARA MOSTRAR. El nombre que se le pega al arma y la
+  //  línea que explica la habilidad viven en Data\lang\<idioma>.json, como
+  //  «ability.<Habilidad>.name» y «ability.<Habilidad>.text». La clave es el
+  //  nombre de la habilidad tal como figura en los pools de acá.
+  //
+  //  Las armas no se escriben: se compran con un presupuesto que sube con la
+  //  oleada. Es el cuarto uso del mismo patrón —oleada, drop, tienda, arma— y por
+  //  el mismo motivo: un presupuesto es la única forma de que el contenido
+  //  generado tenga un techo conocido.
+  //
+  //  ⚠ Entra al hash de /run/start. Tocar esto es TEMPORADA NUEVA.
+  //
+  //  ⚠ "version" es el MISMO número en los ocho del hash; el que el cargador lee
+  //  de verdad es el de enemigos.json.
+  // ---------------------------------------------------------------------------
+  "version": 3,
+
+  // --- Los números que se compran con lo que no se fue en la habilidad -------
+  //
+  // Todos son PUNTOS PORCENTUALES sobre la base de la clase, y se compran de a
+  // "step" para que los números queden redondos y legibles en la UI.
+  // El alcance es el más caro porque es el stat más valioso de un tower defense.
+  "affixes": {
+    "step": 5,
+    "damagePointCost": 2,
+    "cadencePointCost": 3,
+    "rangePointCost": 4
+  },
+
+  // --- La rareza ------------------------------------------------------------
+  //
+  // ⚠ Las tiradas están ENCADENADAS, no son exclusivas: primero legendary, si
+  // falla epic, si falla rare, si falla common. La probabilidad efectiva de las
+  // de abajo es menor que su número.
+  //
+  // chance = clamp(presupuesto / divisor, min, max), en porcentaje entero.
+  //
+  // La chance de legendary sube con el presupuesto, o sea con la oleada: en la
+  // oleada 10 una legendaria arruinaría el resto de la corrida, y en la 90 es el
+  // premio por haber llegado. El techo de 4 es a propósito — si saliera seguido
+  // dejaría de romper el juego y pasaría a ser el juego.
+  "rarity": {
+    "legendary": { "divisor": 200, "min": 0,  "max":  4 },
+    "epic":      { "divisor":  60, "min": 2,  "max": 12 },
+    "rare":      { "divisor":  20, "min": 10, "max": 35 }
+  },
+
+  // Qué parte del presupuesto se aparta para la habilidad, en porcentaje.
+  //
+  // ⚠ Se decide ANTES de gastar. Al revés —gastar en números y ver qué sobra—
+  // las legendarias saldrían siempre con números flojos, porque la habilidad se
+  // comería el resto.
+  "abilityPercent": {
+    "legendary": 60,
+    "epic": 40,
+    "rare": 25,
+    "common": 0
+  },
+
+  // Valor de venta = presupuesto / valueDivisor × (1 + rareza), rareza 0..3.
+  // El precio en la tienda es ese valor × shopPriceMultiplier.
+  "value": {
+    "valueDivisor": 2,
+    "shopPriceMultiplier": 3
+  },
+
+  // --- Los tres pools de habilidades ----------------------------------------
+  //
+  // ⚠ LAS QUE ROMPEN EL JUEGO SOLO SALEN EN LEGENDARIAS. Es lo que las hace
+  // valer: si Chain pudiera aparecer en una rare, el jugador la tendría en la
+  // oleada 15 y el resto de la corrida sería una formalidad.
+  //
+  // ⚠ DoubleShot está en "breakers" y no en "rare" (propuesta V2): un segundo
+  // golpe completo es ×2 de DPS plano, y desde el pool épico dominaba todo lo
+  // demás.
+  //
+  // ⚠ Se llama DoubleShot y no Double porque `Double` es un tipo de .NET, y el
+  // verificador que corre en cada build —el que prohíbe punto flotante dentro de
+  // la simulación— lo leía como un `double` y hacía fallar la compilación.
+  "pools": {
+    "common":   ["Splash", "Bounce", "Frost", "Poison"],
+    "rare":     ["Critical", "Sniper", "Butcher", "Thirst"],
+    "breakers": ["Execute", "Chain", "Greed", "Vampirism", "DoubleShot"]
+  },
+
+  // --- Cuánto pega cada habilidad -------------------------------------------
+  //
+  // magnitud = clamp(base + presupuestoDeLaHabilidad / divisor, min, max).
+  // divisor 0 = valor fijo, no escala con el presupuesto.
+  //
+  // Cada una tiene su propia escala porque significan cosas distintas: un 40% de
+  // Splash es un porcentaje del daño, un 40% de Execute sería un umbral de vida
+  // que mata todo. Los topes están para que ninguna se vuelva absoluta.
+  //
+  // Los topes que NO son la magnitud —cuántos secundarios, cuántos rebotes, el
+  // cooldown de Vampirism— viven en combate.json.
+  "abilities": [
+    { "ability": "Splash",   "base": 20, "divisor": 4,  "min": 20, "max":  90 },
+    { "ability": "Bounce",   "base": 25, "divisor": 4,  "min": 25, "max": 100 },
+    { "ability": "Frost",    "base": 10, "divisor": 8,  "min": 10, "max":  45 },
+    { "ability": "Poison",   "base": 15, "divisor": 5,  "min": 15, "max":  80 },
+
+    // ⚠ Critical (arma) REEMPLAZA el daño por este porcentaje; el perk de gold
+    // golpeCertero SUMA daño extra. No son la misma mecánica.
+    { "ability": "Critical", "base": 120, "divisor": 2, "min": 120, "max": 400 },
+
+    { "ability": "Sniper",   "base": 15, "divisor": 6,  "min": 15, "max":  60 },
+    { "ability": "Butcher",  "base": 20, "divisor": 5,  "min": 20, "max":  80 },
+    { "ability": "Thirst",   "base":  2, "divisor": 40, "min":  2, "max":  15 },
+
+    // Dispara dos veces: no hay medio disparo, así que no escala.
+    { "ability": "DoubleShot", "base": 100, "divisor": 0, "min": 100, "max": 100 },
+
+    // ⚠ El umbral de Execute tiene techo bajo a propósito. Al 25% ya mata casi
+    // todo lo que sobrevivió a un golpe; al 50% haría irrelevante el daño del
+    // arma y la única estadística sería la cadencia.
+    { "ability": "Execute",   "base":  8, "divisor": 40, "min":  8, "max":  25 },
+
+    { "ability": "Chain",     "base": 30, "divisor": 8,  "min": 30, "max":  60 },
+    { "ability": "Greed",     "base": 25, "divisor": 8,  "min": 25, "max":  75 },
+    { "ability": "Vampirism", "base":  1, "divisor": 50, "min":  1, "max":   8 }
+  ]
+}
