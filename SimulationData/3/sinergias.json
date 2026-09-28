@@ -1,0 +1,310 @@
+{
+  // ---------------------------------------------------------------------------
+  //  Las sinergias: qué se gana por MEZCLAR clases en el tablero.
+  //
+  //  ⚠ Existe porque hoy la estrategia óptima medida es poner 36 copias de UNA
+  //  sola clase. `HeadlessRunner.ClaseParaPoner` elige siempre la misma —el
+  //  Asesino— y las otras ocho clases existen para rellenar hasta que aparezca.
+  //  Una sinergia es la razón para poner una clase que pega menos.
+  //
+  //  ⚠ NO SON GRUPOS DISJUNTOS. Una clase puede estar en varias sinergias, y esa
+  //  es la gracia: con particiones fijas —tres grupos de tres— el espacio de
+  //  diseño es una sola tabla y no hay nada que descubrir. Con conjuntos que se
+  //  solapan, «Mago + Clérigo + Paladín» es una combinación posible aunque cada
+  //  una viva además en su propio trío.
+  //
+  //  ⚠ ENTRA AL HASH de /run/start, como los otros siete. Tocar un número de acá
+  //  es TEMPORADA NUEVA del ranking: el bonus multiplica el daño y el alcance de
+  //  cada defensor, así que dos jugadores con sinergias distintas no juegan el
+  //  mismo juego y no pueden compartir tabla.
+  //
+  //  El diseño completo está en Doc\Jugabilidad\11-roster-tablero-y-sinergias.md
+  //
+  //  ⚠ "version" es el MISMO número en los ocho del hash; el que el cargador lee
+  //  de verdad es el de enemigos.json.
+  // ---------------------------------------------------------------------------
+  "version": 3,
+
+  // ⚠ Contra cuántas clases se valida que una sinergia sea ALCANZABLE.
+  //
+  // Con el roster limitado a 5, una sinergia que pide 6 clases distintas no se
+  // puede completar nunca: es contenido muerto que nadie va a ver. `--validar` lo
+  // rechaza, y por eso el número tiene que vivir en algún lado.
+  //
+  // ⚠ Su lugar natural es `run.maxRosterClasses` en curvas.json —el roster no es
+  // cosa de las sinergias— y se muda ahí cuando el tope de 5 clases exista de
+  // verdad. Hoy el roster no tiene tope: este número solo alimenta la validación
+  // de alcanzabilidad, y mudarlo antes dejaría en curvas.json un número que no
+  // hace nada.
+  "maxRosterClasses": 5,
+
+  // --- Cómo se lee una sinergia ----------------------------------------------
+  //
+  // "key"               identidad estable. El nombre que ve el jugador sale de
+  //                     `Data\lang\es.json` como `synergy.<key>.name`, y la
+  //                     descripción como `synergy.<key>.desc`. Acá NO va texto.
+  //
+  // "classes"           el conjunto. Dos o más, sin repetidos.
+  //
+  // "minUnitsPerClass"  cuántos defensores de una clase hacen falta para que esa
+  //                     clase CUENTE. Con 1, un Cazador suelto completa Sombras y
+  //                     sale demasiado barato; con 3, el margen del tablero se
+  //                     achica mucho. Es la palanca para regular eso sin tocar
+  //                     los escalones. Opcional, por defecto 1.
+  //
+  // "scope"             a quién le llega el bonus:
+  //                       "members" → solo a los defensores de las clases de esta
+  //                                   sinergia. Concentrar paga.
+  //                       "board"   → a TODO el tablero. Es mucho más fuerte:
+  //                                   usar con magnitudes chicas.
+  //                     Opcional, por defecto "members".
+  //
+  // "tiers"             los escalones. "need" es cuántas clases DISTINTAS del
+  //                     conjunto hay puestas en el tablero. Tienen que ir de
+  //                     menor a mayor, empezar en 2 o más, y ninguno puede pedir
+  //                     más clases de las que tiene el conjunto.
+  //
+  // ⚠ "effect" NO PUEDE SER "Cadence", y el validador lo rechaza. El daño va en
+  // centésimas de punto y el alcance en milésimas de celda —los dos escalados
+  // adentro de la simulación—, pero la CADENCIA sigue en ticks enteros, de 18 a
+  // 30. Un tick es un escalón del 3,3% al 5,6%: un +5% sobre cadencia 18 da 17,14
+  // y trunca a 17, y cualquier bonus más chico que el escalón hace exactamente
+  // cero. Es la anomalía P0 de la propuesta V2, viva todavía en cadencia. Para
+  // que una sinergia pueda dar velocidad de ataque hay que escalar la cadencia
+  // primero, igual que se hizo con el daño y el alcance.
+  //
+  // "magnitude" son PUNTOS PORCENTUALES enteros y siempre positivos — salvo en
+  // los efectos al matar, donde son lo que dice cada uno.
+  //
+  // "only"              opcional, dentro de un escalón: a qué clases DEL CONJUNTO
+  //                     les llega. Es lo que permite una sinergia ASIMÉTRICA:
+  //                     «Ladrón + Bardo: el Ladrón roba». El Bardo cuenta para
+  //                     activarla y no cobra. Tiene que ser subconjunto de
+  //                     "classes"; sin "only", llega a todo el conjunto.
+  //
+  // --- Los efectos AL MATAR ---------------------------------------------------
+  //
+  // Los dos únicos que no son un número sobre el defensor. Se resuelven en la
+  // fase de muertes y SOLO para el defensor cuyo GOLPE DIRECTO mató: una muerte
+  // por splash, cadena o veneno no tiene dueño y no procea. Es la primera regla
+  // del sistema de estados aplicada a la muerte.
+  //
+  //   "DoubleGoldOnKill"  magnitude = % de chance de que el muerto suelte el
+  //                       DOBLE de oro. Los jefes quedan afuera, como en Saqueo.
+  //   "TowerHealOnKill"   magnitude = PUNTOS de vida que recupera la Torre.
+  //
+  // ⚠ Los dos llevan "cap" OBLIGATORIO: el tope por oleada, en su unidad —oro
+  // extra máximo, o puntos de vida máximos—. Es la lección de Saqueo: sin tope,
+  // una build de economía se vuelve obligatoria, que es lo contrario de una
+  // decisión. Y "cap" está PROHIBIDO en Damage y Range, donde no hace nada: un
+  // número que no hace nada en un archivo de balance es un número que alguien va
+  // a tocar creyendo que hace algo.
+  //
+  // No compiten con la ranura de comportamiento del perk de Oro: aquella es «qué
+  // hace mi golpe», esto es «qué pasa cuando mato». Un Ladrón con Saqueo
+  // equipado Y la sinergia cobra las dos, y está bien: son dos decisiones
+  // distintas, una del roster y otra del tablero. Lo que las acota es el cap.
+  //
+  // --- ⚠ CÓMO SE ACUMULAN (decidido el 2026-09-09) ---------------------------
+  //
+  // Son tres reglas distintas y hay que leerlas juntas o los números engañan:
+  //
+  // 1. Entre ESCALONES de la misma sinergia: NO acumulan, gana el más alto. Con
+  //    need 2 → +10 y need 3 → +25, tener las tres clases da +25, no +35. Si se
+  //    sumaran, el segundo escalón dejaría de ser una decisión y sería un piso.
+  //
+  // 2. Entre SINERGIAS DISTINTAS: acumulan SUMÁNDOSE. Un Paladín en «guerreros»
+  //    (+25 de daño) y «acero» (+12) lleva +37.
+  //
+  //    ⚠ NO SE COMPONEN, Y ESTA ES LA REGLA QUE SOSTIENE TODO EL ARCHIVO. Con las
+  //    cinco sinergias de hoy la diferencia parece chica —componer da 1,51 contra
+  //    1,45 de sumar— y esa cifra engaña: lo que importa NO es cuánto se despegan
+  //    hoy, es que componer CRECE CON LA CANTIDAD DE SINERGIAS y sumar no.
+  //
+  //      5 sinergias de +12% sobre una clase → sumar 1,60 · componer 1,76 (+10%)
+  //      8 sinergias de +12% sobre una clase → sumar 1,96 · componer 2,48 (+26%)
+  //
+  //    Este archivo existe para que agregar sinergias sea barato. Componiendo,
+  //    cada sinergia nueva no suma su bonus: MULTIPLICA todos los anteriores, así
+  //    que el costo de agregar la número diez depende de las nueve que ya estaban
+  //    y nadie puede razonar sobre una sola línea del JSON. Sumando, agregar una
+  //    sinergia cuesta exactamente lo que dice su magnitud — que es lo único que
+  //    hace seguro expandir el catálogo.
+  //
+  // 3. ⚠ Contra el RESTO DEL BUILD: MULTIPLICAN, y se aplican AL FINAL. El nivel,
+  //    los perks y el arma se suman entre sí en un solo acumulador y se aplican de
+  //    una vez; el total de sinergia multiplica ESE resultado.
+  //
+  //    Es la única de las tres que no sigue el idioma que ya usaba el proyecto, y
+  //    es deliberada: LA COMPOSICIÓN DEL TABLERO ESCALA CON EL BUILD en vez de
+  //    competir con él. Un +25% vale más en la oleada 60 —nivel 6, arma épica—
+  //    que en la 15, así que componer bien madura en vez de diluirse.
+  //
+  // ⚠ AL CALIBRAR: multiplicar ENSANCHA LA BRECHA ENTRE CLASES. Con un build de
+  // +90% encima, la ventaja del Paladín sobre el Guerrero pasa de ×1,86 sin
+  // sinergias a ×2,03 sumando y a ×2,16 multiplicando.
+  //
+  // ⚠ EL PRIMER NÚMERO A REVISAR ES LA BRECHA DE «caceria», no el techo del
+  // Paladín: el catálogo de abajo lo dejó en +37, parejo con Guerrero y Asesino.
+  // Lo que `--validar` reporta hoy es que adentro de «caceria» el Asesino junta
+  // +37% de daño y el Cazador solo +12%. El conjunto se escribió PARA el Cazador,
+  // que es la clase más floja del roster, y termina dándole cinco veces menos que
+  // al Asesino porque a este lo empujan «guerreros» y «acero» desde afuera. La
+  // salida barata es `only: ["Hunter"]`, que el lector ya soporta.
+  //
+  // ⚠ Y ESTAS MAGNITUDES TODAVÍA NO ESTÁN CALIBRADAS CONTRA NADA. `--balance` no
+  // las puede medir todavía: el bot amontona UNA sola clase, así que casi nunca
+  // llega al `need: 2` de ninguna sinergia y las tres medias se mueven ±1. Hasta
+  // que `HeadlessRunner.ClaseParaPoner` sepa componer, estos números son una
+  // propuesta razonada, no un balance medido.
+
+  "synergies": [
+    // --- Los tres tríos base -------------------------------------------------
+    //
+    // Reparten las nueve clases sin dejar ninguna afuera. El desbalance entre
+    // ellos es deliberado y sale de la regla que ya está en clases.json: MÁS
+    // ALCANCE, MENOS GOLPE. Los Guerreros pegan el doble que las Sombras y ven
+    // pasar a cada bicho una sola vez por delante; por eso los Guerreros suben
+    // daño y los otros dos suben alcance.
+    {
+      "key": "guerreros",
+      "classes": ["Warrior", "Paladin", "Assassin"],
+      "minUnitsPerClass": 1,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "Damage", "magnitude": 10 },
+        { "need": 3, "effect": "Damage", "magnitude": 25 }
+      ]
+    },
+    {
+      "key": "misticos",
+      "classes": ["Mage", "Cleric", "Druid"],
+      "minUnitsPerClass": 1,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "Range", "magnitude":  8 },
+        { "need": 3, "effect": "Range", "magnitude": 20 }
+      ]
+    },
+    {
+      "key": "sombras",
+      "classes": ["Thief", "Bard", "Hunter"],
+      "minUnitsPerClass": 1,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "Range", "magnitude":  8 },
+        { "need": 3, "effect": "Range", "magnitude": 20 }
+      ]
+    },
+
+    // --- Las que cruzan los tríos --------------------------------------------
+    //
+    // ⚠ ACÁ ESTÁ EL PUNTO DEL SISTEMA. No son más grupos: son conjuntos que PISAN
+    // a los de arriba. Un Paladín puesto junto a un Clérigo cuenta para
+    // «guerreros», para «fe» y para «concilio» al mismo tiempo, y esa acumulación
+    // es la decisión que el jugador tiene que leer.
+    //
+    // Son pares, de un solo escalón y magnitud chica: lo que se acumula tiene
+    // que valer menos que lo que se completa. `--validar` reporta el techo que
+    // junta cada clase, justamente para ver esto — y para que no todas las clases
+    // tengan que estar en todo: el Druida y el Ladrón no suman daño en ningún
+    // lado, a propósito, y lo que ganan es otra cosa.
+    //
+    // ⚠ EL PALADÍN Y EL CLÉRIGO NO SUMAN DAÑO EN LOS CRUCES. La primera versión
+    // tenía a «fe» y «concilio» dando daño, y el techo del Paladín se iba a +45%
+    // contra +25% de sus compañeros de trío: lo pisaban tres conjuntos. Ahora
+    // «fe» cura la Torre y «concilio» da alcance —un Paladín que llega más lejos
+    // es interesante y no es más daño—, y los tres Guerreros quedan en +37.
+
+    // La fe cura: Clérigo y Paladín, dos de cada uno, y cada muerte que dé
+    // cualquiera de los dos le devuelve vida a la Torre. Es el lugar de la
+    // curación en el tablero, que hasta acá solo existía como perk de Oro.
+    {
+      "key": "fe",
+      "classes": ["Cleric", "Paladin"],
+      "minUnitsPerClass": 2,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "TowerHealOnKill", "magnitude": 2, "cap": 30 }
+      ]
+    },
+
+    // Saber, fe y acero. Alcance y no daño: ver arriba.
+    {
+      "key": "concilio",
+      "classes": ["Mage", "Cleric", "Paladin"],
+      "minUnitsPerClass": 2,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "Range", "magnitude":  5 },
+        { "need": 3, "effect": "Range", "magnitude": 12 }
+      ]
+    },
+
+    // ⚠ EL LADRÓN ROBA. Ladrón y Bardo son las dos clases de «saqueo» en el
+    // catálogo de Oro; juntas, cada bicho que MATA EL LADRÓN tiene un cuarto de
+    // chance de soltar el doble. Solo el Ladrón, por "only": el Bardo hace falta
+    // para activarla y no cobra — es la primera sinergia asimétrica del archivo.
+    //
+    // El cap de 60 por oleada es el mismo que el de Saqueo, y por lo mismo. Con
+    // 25% y kills solo del Ladrón, en la práctica se llega al tope en las
+    // oleadas medias y no antes: es un ingreso, no una fuente.
+    {
+      "key": "saqueo",
+      "classes": ["Thief", "Bard"],
+      "minUnitsPerClass": 1,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "DoubleGoldOnKill", "magnitude": 25, "cap": 60, "only": ["Thief"] }
+      ]
+    },
+
+    // Los dos que comparten Sobrepenetración y Ricochet: los que pegan de lejos
+    // y de costado. Daño, porque el Cazador es la clase más floja del roster
+    // (5,71 de DPS) y esta es su única sinergia de daño.
+    {
+      "key": "caceria",
+      "classes": ["Hunter", "Assassin"],
+      "minUnitsPerClass": 1,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "Damage", "magnitude": 12 }
+      ]
+    },
+
+    // Guerrero y Paladín comparten Golpe Sísmico y Guardia del Umbral: la línea
+    // del frente. Con esto los tres Guerreros quedan parejos en +37.
+    {
+      "key": "acero",
+      "classes": ["Warrior", "Paladin"],
+      "minUnitsPerClass": 1,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "Damage", "magnitude": 12 }
+      ]
+    },
+
+    // El bosque: Druida y Cazador. Alcance, que es lo que los dos venden.
+    {
+      "key": "naturaleza",
+      "classes": ["Druid", "Hunter"],
+      "minUnitsPerClass": 1,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "Range", "magnitude": 10 }
+      ]
+    },
+
+    // Mago y Bardo: en Argentum el Bardo también lanza hechizos. Daño, que es lo
+    // único que le falta al Bardo para dejar de ser solo alcance.
+    {
+      "key": "arcano",
+      "classes": ["Mage", "Bard"],
+      "minUnitsPerClass": 1,
+      "scope": "members",
+      "tiers": [
+        { "need": 2, "effect": "Damage", "magnitude": 10 }
+      ]
+    }
+  ]
+}
