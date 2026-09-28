@@ -113,7 +113,7 @@ public static class RunEndpoints
         HttpContext http,
         TokenRepository tokens,
         RunRepository runs,
-        ApiConfig config,
+        SimulationDataCatalog simulation,
         CancellationToken ct)
     {
         long? idCuenta = await Authentication.AccountOfAsync(http, tokens, ct);
@@ -124,8 +124,7 @@ public static class RunEndpoints
         // cliente juega con otros números que el servidor, la corrida no es
         // reproducible y el ranking deja de comparar lo mismo. Rechazarla al
         // empezar es infinitamente mejor que rechazarla después de tres horas.
-        if (!string.IsNullOrEmpty(config.DataHash) &&
-            !string.Equals(pedido.DataHash, config.DataHash, StringComparison.Ordinal))
+        if (!string.Equals(pedido.DataHash, simulation.Current.Hash, StringComparison.Ordinal))
         {
             return Results.Json(ErrorResponse.StaleData, statusCode: StatusCodes.Status409Conflict);
         }
@@ -141,9 +140,9 @@ public static class RunEndpoints
         string plataforma = pedido.Platform == "celular" ? "celular" : "pc";
 
         var (idNueva, abandonada) = await runs.AbrirAsync(
-            idCuenta.Value, seed, config.DataVersion, plataforma, ct);
+            idCuenta.Value, seed, simulation.Current.Version, simulation.Current.Hash, plataforma, ct);
 
-        return Results.Ok(new StartResponse(idNueva, seed, config.DataVersion, abandonada));
+        return Results.Ok(new StartResponse(idNueva, seed, simulation.Current.Version, abandonada));
     }
 
     private static async Task<IResult> FinishAsync(
