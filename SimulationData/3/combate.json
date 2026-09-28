@@ -1,0 +1,452 @@
+{
+  // ---------------------------------------------------------------------------
+  //  Los números del tick: qué hace cada comportamiento cuando pega, cuánto dura
+  //  cada estado y dónde está el techo de cada uno.
+  //
+  //  Esto es lo que antes vivía como literales adentro de Partida.cs. Son las
+  //  reglas más difíciles de balancear del juego porque NO SE VEN EN NINGUNA
+  //  TABLA: el jugador ve «Ricochet 55%», no ve que el salto tiene un límite de
+  //  dos celdas de ruta.
+  //
+  //  ⚠ Entra al hash de /run/start. Tocar esto es TEMPORADA NUEVA del ranking.
+  //
+  //  ⚠ TODO ACÁ ES ENTERO Y ASÍ SE QUEDA. Dentro de la simulación están
+  //  prohibidos float, double, System.Random, Math.Sin/Cos/Atan2/Pow/Log. Un
+  //  número con coma en este archivo es un bug, no una precisión.
+  //
+  //  ⚠ Las distancias van en MILÉSIMAS DE CELDA y el daño en CENTÉSIMAS DE
+  //  PUNTO — la escala interna de la simulación. Los porcentajes no tienen
+  //  unidad y se escriben como puntos porcentuales enteros.
+  //
+  //  ⚠ "version" es el MISMO número en los ocho del hash; el que el cargador lee
+  //  de verdad es el de enemigos.json.
+  // ---------------------------------------------------------------------------
+  "version": 3,
+
+  // --- El enemigo ------------------------------------------------------------
+  //
+  // El daño de un enemigo es el PROMEDIO de danoMin y danoMax, no una tirada.
+  // Es determinismo barato: una tirada por golpe consumiría RNG en un punto que
+  // depende de cuántos enemigos estén vivos, y eso corre toda la secuencia.
+  "enemy": {
+    "damageAverageDivisor": 2,
+    "minimumDamage": 1
+  },
+
+  // --- Los jefes resisten el control ----------------------------------------
+  //
+  // ⚠ ES LA REGLA QUE HACE QUE LOS JEFES SIGAN SIENDO JEFES. Sin ella, un
+  // druida con Raíces y un mago con Escarcha dejan al jefe de área clavado en la
+  // ruta y el combate deja de existir. Con ella, el control SIGUE SIRVIENDO
+  // —vale la mitad, no cero— y la pelea se gana pegando.
+  //
+  // Dos números cubren todos los estados en vez de un valor de jefe por perk:
+  // la potencia se recorta parejo y el control duro se recorta por duración.
+  //
+  // ⚠ El JEFE FINAL —el Dragón Rojo de la oleada 100— es un escalón aparte:
+  // inmune al control duro y al empuje, y con la potencia recortada al mínimo.
+  // Matarlo es cómo se gana la corrida; ganarla dejándolo quieto sería ganar por
+  // una mecánica lateral y no por la partida.
+  "bossControl": {
+    "powerPercent": 50,
+    "hardCcDurationPercent": 40,
+    "pushPercent": 30,
+    "hardCcExtraImmunityTicks": 60,
+    "maxPushPerBoss": 1,
+    "finalBossPowerPercent": 30,
+    "finalBossImmuneToHardCc": true,
+    "finalBossImmuneToPush": true,
+    "lootIgnoresBosses": true
+  },
+
+  // --- Los estados: cuánto duran y hasta dónde llegan ------------------------
+  //
+  // ⚠ NINGUNO APILA. Gana la potencia más fuerte y cada aplicación refresca la
+  // duración. Es la regla que impide que la estrategia óptima sea siempre "poné
+  // diez del mismo", que es lo contrario de lo que un roguelike de composición
+  // quiere premiar. Los DoT son la única excepción, y con su propia regla:
+  // conservan Potencia × Duración en vez de pisarse.
+  //
+  // ⚠ NINGUNO LO APLICA UN GOLPE SECUNDARIO. Splash, cadena, rebote, eco, DoT y
+  // transferencia de overkill solo restan vida. Sin eso, Cadena crea Cadena.
+  "states": {
+    // Ralentización. El techo existe porque un enemigo parado no es un enemigo
+    // lento: es un enemigo muerto en cámara lenta, y si además queda fuera del
+    // alcance de todos, clava la oleada para siempre.
+    "slow": {
+      "capPercent": 60,
+      "durationTicks": 90,
+      "maxDurationTicks": 180
+    },
+
+    // Vulnerabilidad: recibe más daño DIRECTO de todas las clases. No apila
+    // porque un multiplicador global escala con la cantidad de defensores, y con
+    // treinta en el tablero un +8% que se sumara sería un ×3.
+    "vulnerable": { "durationTicks": 60 },
+
+    // Debilidad: le hace menos daño a la Torre si llega. No sube el DPS de
+    // nadie; reduce el castigo por filtrar, que es una utilidad distinta.
+    "weaken": { "durationTicks": 300 },
+
+    // Marca de caza: las OTRAS clases pegan más fuerte. La que marca NO cobra,
+    // o sería un bonus propio disfrazado de soporte.
+    "huntMark": { "durationTicks": 90 },
+
+    // ⚠ CONTROL DURO CON PERÍODO REFRACTARIO. Al salir de la raíz el enemigo
+    // queda inmune un rato, y además hay un tope de veces por bicho. Es lo que
+    // separa "control" de "perma-stun": sin las dos cosas, tres druidas alcanzan
+    // para que nada camine nunca más. La idea sale del rework de aturdimiento de
+    // Infinitode 2.
+    "root": {
+      "durationTicks": 15,
+      "immunityTicks": 120,
+      "maxPerEnemy": 6
+    },
+
+    // Empuje hacia atrás por la ruta. El presupuesto es finito por enemigo: sin
+    // el tope, dos guerreros mantienen a un bicho oscilando en el mismo tramo.
+    // ⚠ Nunca lo empuja detrás del spawn.
+    // La distancia del empujón es la magnitud del perk, en milésimas de celda.
+    "push": { "maxPerEnemy": 3 },
+
+    // Aura de cadencia. No afecta al emisor —si no, sería un buff propio— y no
+    // apila con otra del mismo nombre.
+    "inspire": {
+      "durationTicks": 90,
+      "radiusCells": 3
+    },
+
+    // Marca de botín. Dos topes: cuánto puede dar UN enemigo y cuánto puede dar
+    // UNA oleada. Sin los dos, una build de economía se vuelve obligatoria.
+    "loot": {
+      "durationTicks": 120,
+      "maxGoldPerEnemy": 10,
+      "maxGoldPerWave": 60
+    },
+
+    // ⚠ Los DoT se guardan como PRESUPUESTO: cuánto daño falta y a qué ritmo
+    // sale. Mezclar dos aplicaciones del mismo DoT SUMA lo pendiente y se queda
+    // con el ritmo más alto — o sea, conserva Potencia × Duración. Dos golpes de
+    // 30 a 10 por segundo dan 10 por segundo durante más tiempo, no 20 por
+    // segundo: el jugador cobra todo lo que puso, pero no antes.
+    //
+    // La idea es el algoritmo de apilado de estados de Defender's Quest.
+    //
+    // "maxDurationTicks" es el techo: si lo pendiente no entra, SE SUBE EL RITMO
+    // en vez de tirar daño. Lo que el jugador pagó con sus golpes se cobra.
+    "dot": {
+      "durationTicks": 90,
+      "maxDurationTicks": 180
+    }
+  },
+
+  // --- Los comportamientos de Oro -------------------------------------------
+  //
+  // ⚠ SOLO SE APLICA UN COMPORTAMIENTO POR DEFENSOR: el del perk de tier más
+  // alto equipado. Y si el arma tiene habilidad, el comportamiento del perk
+  // queda en Ninguno — el arma pisa al perk. Desde Drops_v2 eso es EXPLÍCITO:
+  // la mochila no deja equipar un segundo Oro y avisa cuando el arma lo tapa.
+  //
+  // Acá viven los parámetros que NO son la magnitud: cada cuántos golpes
+  // dispara, a qué distancia alcanza y cuántos secundarios toca. La magnitud
+  // sale de perks.json, que es donde el que balancea la busca.
+  "behaviors": {
+    // Rebota a un enemigo cercano por ruta.
+    // ⚠ Cada salto exige estar a esta distancia o menos del objetivo ANTERIOR.
+    // Antes rebotaba al siguiente vivo en orden de spawn sin mirar distancia: un
+    // rebote le pegaba a un bicho del otro lado del mapa.
+    "ricochet": {
+      "bounces": 1,
+      "jumpWindowThousandths": 2000
+    },
+
+    // Cadena acotada. Dos saltos y cada uno pega menos: 40% al primero, 25% al
+    // segundo (magnitude y magnitudeB en perks.json). Reemplaza al rebote global
+    // que tenía Descarga Eléctrica.
+    "chain": {
+      "maxJumps": 2,
+      "jumpWindowThousandths": 1500
+    },
+
+    // ⚠ El radio del splash se mide SOBRE LA RUTA, en distancia recorrida, no en
+    // distancia euclídea. Un enemigo no tiene (x, y): tiene una
+    // DistanciaRecorrida, y comparar eso es una resta.
+    //
+    // "totalCapPercent" es el techo del daño secundario SUMADO. Sin él, la
+    // densidad multiplicaba el daño en las oleadas apretadas y el splash escalaba
+    // solo con que hubiera más bichos.
+    "splash": {
+      "maxSecondaries": 3,
+      "radiusThousandths": 1800,
+      "totalCapPercent": 105
+    },
+
+    // Quemadura al objetivo y una versión menor a los cercanos.
+    "burn": {
+      "maxSecondaries": 2,
+      "radiusThousandths": 1500
+    },
+
+    // Cada cuántos golpes DE ESE DEFENSOR cae el crítico.
+    //
+    // ⚠ CONTADOR POR DEFENSOR, no Tick % 7 global. Con el global criticaban
+    // todos juntos en el mismo tick, y un defensor cuya cadencia fuera múltiplo
+    // de 7 criticaba siempre o nunca según la fase en que se lo puso.
+    "criticalHit": { "everyHits": 7 },
+
+    // Golpes seguidos al MISMO objetivo suben el daño. Se pierde al cambiar de
+    // objetivo o tras "resetTicks" sin pegar. Premia mantener el foco sin mejorar
+    // la limpieza de oleadas débiles, que es el nicho que le faltaba al Mago.
+    "focus": {
+      "maxStacks": 5,
+      "resetTicks": 60
+    },
+
+    // Cada cuántos golpes se aplica cada estado periódico.
+    "sunder":  { "everyHits": 4 },
+    "root":    { "everyHits": 6 },
+    "seismic": { "everyHits": 5 },
+    "inspire": { "everyHits": 8 },
+
+    // El eco sale unos ticks DESPUÉS del golpe que lo creó. Si el objetivo murió
+    // mientras tanto, busca otro a "searchRadiusThousandths" de ruta.
+    // ⚠ El eco NO dispara perks: es daño secundario.
+    "arcaneEcho": {
+      "everyHits": 4,
+      "delayTicks": 15,
+      "searchRadiusThousandths": 1000
+    },
+
+    // Al matar con daño DIRECTO, parte del sobrante salta al vecino de ruta.
+    // "capPercentOfDamage" impide que un golpe enorme contra un bicho de una vida
+    // se convierta en un segundo golpe enorme: el overkill transferido no puede
+    // pasar de esta fracción del daño del golpe.
+    // ⚠ Una sola transferencia. No encadena.
+    "overpenetration": {
+      "capPercentOfDamage": 40,
+      "radiusThousandths": 1500
+    },
+
+    // Umbrales de vida de los dos condicionales. Oportunista remata, Primer
+    // Impacto abre: son el mismo mecanismo con el umbral dado vuelta, y por eso
+    // van juntos.
+    "opportunist": { "hpThresholdPercent": 25 },
+    "firstStrike": { "hpThresholdPercent": 80 },
+
+    // Sin nadie en alcance durante este rato, el próximo golpe sale cargado.
+    // Una sola carga guardada: si se acumularan, un defensor en una esquina
+    // muerta del mapa haría un golpe infinito.
+    "charge": { "idleTicks": 45 },
+
+    // --- Los cinco que antes solo existían como habilidad de arma ------------
+    //
+    // ⚠ Los cinco comportamientos YA ESTABAN en el tick, con sus topes, pero el
+    // catálogo de perks no los ofrecía: se veían solo si el generador de armas
+    // los regalaba. Estos son sus topes de versión ORO, más bajos que los de
+    // arma, porque un arma legendaria es el premio de una corrida y un Oro es
+    // uno de los ocho que reparte el juego.
+
+    // Tiro Lejano y Carnicería escalan con qué porción del alcance usó el
+    // disparo. Son enteros en centésimas: 100 = el alcance entero. Los mismos
+    // números que «weaponAbilities.rangePortion*», y duplicados a propósito:
+    // así rebalancear el arma no mueve el perk sin que nadie lo haya pedido.
+    "rangeScaling": {
+      "portionCap": 100,
+      "portionScale": 100
+    },
+
+    // ⚠ Techo del bonus ACUMULADO por muertes de la oleada, no por muerte. Se
+    // reinicia al lanzar cada oleada. 45 contra los 100 del arma Sed: con 3%
+    // por muerte se llega al techo a los 15 kills, o sea dentro de una oleada
+    // normal, y el perk vale un +45% sostenido en vez de un ×2.
+    "bloodthirst": { "bonusCap": 45 },
+
+    // Drenaje: la versión Oro de Vampirismo. Cura MENOS y más espaciado —2
+    // puntos cada 45 ticks contra 1-8 cada 30—, y con un tope por oleada de 60
+    // contra 150.
+    //
+    // ⚠ Los topes son PROPIOS y no se comparten con los del arma. Un clérigo
+    // con Drenaje y un guerrero con arma de Vampirismo pueden estar en el mismo
+    // tablero, y con un solo acumulador uno le comería el techo al otro.
+    "siphon": {
+      "cooldownTicks": 45,
+      "maxHealingPerWave": 60
+    }
+  },
+
+  // --- Los Únicos ------------------------------------------------------------
+  //
+  // ⚠ UN ÚNICO ES LA FUSIÓN DE DOS ORO AL VALOR PLENO DE LOS DOS, y ocupa UN
+  // SOLO SLOT. El slot liberado es la otra mitad del premio.
+  //
+  // ⚠ Este párrafo decía lo contrario —«con las magnitudes rebajadas»— y se
+  // contradecía con el de doce líneas más abajo, en el mismo comentario. Es el
+  // texto viejo, de antes de sacar la rebaja: quedó arriba y el nuevo se escribió
+  // debajo. Manda el de abajo, que es el que explica por qué.
+  //
+  // Los dos números principales de cada Único van en perks.json como "magnitude"
+  // y "magnitudeB". Acá quedan los topes que no entran en esos dos.
+  // ⚠ LOS ÚNICOS VALEN LO QUE VALEN SUS DOS ORO, SIN REBAJA — y estos topes son
+  // la segunda mitad de esa regla.
+  //
+  // Estaban rebajados dos veces: la magnitud en perks.json Y el tope de acá.
+  // El slow duraba 75 ticks contra los 90 del Oro, la raíz 12 contra 15, el botín
+  // topeaba en 8/50 contra 10/60. Sumado a la rebaja de magnitud, un Único
+  // terminaba valiendo bastante menos que sus dos componentes juntos.
+  //
+  // La regla que invalidaba el argumento de la rebaja es del mismo sistema: LA
+  // RANURA DE COMPORTAMIENTO ES UNA, así que «tener los dos Oro» en la misma
+  // clase no existe y no había con qué comparar. Lo que fusionar cuesta —dos de
+  // los ~8 Oro de la corrida— ya es la decisión.
+  //
+  // Medido con la rebaja: el `techo` fabricaba un Único por corrida y llegaba
+  // exactamente igual de lejos que la política que no fusiona nunca (69 contra 69
+  // oleadas en 24 corridas).
+  "uniques": {
+    // Onda de Frío (Mago): splash + slow, los dos al valor del Oro.
+    // 3 secundarios es lo mismo que «behaviors.splash.maxSecondaries».
+    "frostWaveMaxSecondaries": 3,
+    "frostWaveSlowTicks": 90,
+
+    // Perforación (Cazador): concentración + transferencia de overkill.
+    // ⚠ El radio es MAYOR que el del Oro (1.500) y siempre lo fue: es identidad
+    // del Único, no una rebaja al revés.
+    "perforationRadiusThousandths": 2000,
+
+    // Invisibilidad (Ladrón): botín + overkill, con los topes del Oro.
+    "invisibilityMaxGoldPerEnemy": 10,
+    "invisibilityMaxGoldPerWave": 60,
+
+    // Terrible Hambre de Igôr (Druida): raíz + quemadura. Los 15 ticks son los
+    // mismos de «states.root.durationTicks», y la raíz sigue arrastrando su
+    // período refractario y su tope por enemigo.
+    "terribleHungerRootTicks": 15,
+
+    // Fuerza (Guerrero): empuje + vulnerabilidad. Los 3 empujones son los mismos
+    // de «states.push.maxPerEnemy», así que ya estaba al valor pleno.
+    "strengthMaxPushPerEnemy": 3
+  },
+
+  // --- Habilidades de arma ---------------------------------------------------
+  //
+  // Los topes que no son la magnitud. La magnitud sale de generador-armas.json.
+  //
+  // ⚠ Las habilidades de arma NO pasaron por el rework de Estados_v2 salvo en lo
+  // que comparten: Escarcha de arma aplica el mismo estado de slow que el perk,
+  // con las mismas reglas de no-apilado y de resistencia de jefe, y Veneno de
+  // arma aplica el mismo DoT. Lo que no cambió es que un arma con habilidad
+  // sigue tapando el comportamiento del perk.
+  "weaponAbilities": {
+    "maxSplashSecondaries": 4,
+    "bounceBounces": 1,
+    "maxChainSecondaries": 5,
+
+    // ⚠ El segundo disparo de Doble NO es un golpe entero. Un golpe completo
+    // equivale a duplicar el daño directo —+100%— y a ese precio ninguna otra
+    // habilidad puede competir por la misma ranura. Con 70 sigue siendo
+    // clarísimamente legendaria y deja lugar para que Cadena, Ejecutar y Codicia
+    // sean elecciones y no consuelos.
+    "doubleShotPercent": 70,
+
+    // ⚠ Techo del daño SECUNDARIO TOTAL de Cadena, en porcentaje del golpe
+    // directo. Sin él, el daño escala lineal con la densidad: cinco secundarios
+    // al 60% son +300% en una oleada apretada y +0% en una vacía, o sea una
+    // habilidad cuyo poder lo decide la formación y no el jugador. Con 150, si
+    // cada salto pega 60 la repartición es 60 / 60 / 30 / 0 / 0.
+    "chainSecondaryCapPercent": 150,
+
+    // ⚠ Codicia SÍ lleva topes ahora. La economía tiene realimentación positiva
+    // —más oro, más defensores, más kills, más oro— así que una habilidad
+    // económica sin techo no es fuerte: es la única build. Los dos hacen falta:
+    // sin el de oleada, sesenta bichos marcados pagan sesenta veces el tope
+    // individual.
+    //
+    // Sigue siendo mejor que el perk Saqueo, como corresponde a una legendaria,
+    // pero ya no puede duplicar la economía de una oleada entera.
+    "greedMaxExtraPerEnemy": 15,
+    "greedMaxExtraPerWave": 120,
+
+    // ⚠ Techo de curación de Vampirismo POR OLEADA, en puntos de vida de la
+    // Torre. La ventana de 30 ticks por clase limita el ritmo pero no el total:
+    // una oleada larga con una build de cadencia seguía curando más de lo que la
+    // oleada podía bajar, y la Torre quedaba prácticamente inmortal. Con 150 la
+    // habilidad sigue siendo una herramienta seria de recuperación.
+    "vampirismMaxHealingPerWave": 150,
+
+    // ⚠ Techo del bonus ACUMULADO por muertes de la oleada, no por muerte. Se
+    // reinicia al lanzar cada oleada: el techo real tiene que ser cuánto se
+    // puede matar de una vez, no cuánto se lleva matado en cien oleadas.
+    "thirstBonusCap": 100,
+
+    // Francotirador y Carnicero escalan con qué porción del alcance usó el
+    // disparo. Son enteros en centésimas: 100 = el alcance entero.
+    "rangePortionCap": 100,
+    "rangePortionScale": 100,
+
+    // ⚠ Ejecutar: umbral de vida por debajo del cual mata de un golpe.
+    //
+    // El umbral efectivo es min(magnitud del arma, el de acá) — o sea, estos son
+    // TECHOS, no valores. Los jefes tienen el suyo mucho más bajo porque un jefe
+    // que muere por un umbral no es un jefe, y EL JEFE FINAL ES INMUNE: matarlo
+    // es cómo se gana la corrida, y ganar por Ejecutar sería ganar por el drop y
+    // no por la partida.
+    "executeThresholdTroop": 20,
+    "executeThresholdBoss": 5,
+    "finalBossImmuneToExecute": true,
+
+    // ⚠ Un proc por CLASE cada tantos ticks, no por defensor. Sin esto, diez
+    // defensores de la misma clase con un arma de Vampirismo curaban la Torre
+    // más rápido de lo que una oleada entera podía bajarla.
+    "vampirismCooldownTicks": 30,
+
+    // Cuánto dura la marca de oro extra de Codicia. Se marca al golpear y se
+    // cobra en la fase de muertes, cuando se sabe si el golpe mató —cobrarlo al
+    // golpear daría oro por pegarle a algo que sobrevive.
+    //
+    // ⚠ Antes la marca duraba PARA SIEMPRE: un solo golpe convertía a un tanque
+    // en alcancía aunque lo terminara matando otro, minutos después.
+    //
+    // Codicia NO lleva tope de oro: es una habilidad de arma legendaria, o sea
+    // el premio de una corrida. El perk Saqueo, que hace lo mismo más chico, sí
+    // lo lleva.
+    "greedMarkDurationTicks": 60
+  },
+
+  // ---------------------------------------------------------------------------
+  //  Los rasgos de los enemigos
+  // ---------------------------------------------------------------------------
+  //
+  //  Tres mecánicas, y las tres siguen la misma regla: NO agregan resistencias,
+  //  ni inmunidades, ni curación, ni destruyen defensores. Solo hacen que el
+  //  último tramo de una pelea sea más urgente, que es lo que se puede leer en
+  //  pantalla sin explicar nada.
+  //
+  //  ⚠ Ninguno da daño extra. Un enemigo que además pega más fuerte al enfurecer
+  //  convierte una filtración en una derrota instantánea, y el jugador no tiene
+  //  forma de haberlo previsto.
+  //
+  //  "enrage" lo tienen TODOS los jefes, y una sola vez por pelea: al bajar del
+  //  umbral de vida aceleran un rato. El jefe final acelera menos porque es el
+  //  final de cien oleadas y ahí una aceleración grande es una derrota que no se
+  //  ve venir.
+  //
+  //  "impulsive" y "leader" son rasgos OCASIONALES de la tropa; quién los trae lo
+  //  decide el armador de la oleada y se paga del presupuesto (curvas.json
+  //  §npcPerks). Acá vive solo qué hacen.
+  //
+  //  ⚠ El aura del líder NO APILA con otra, igual que todos los estados del
+  //  juego: gana la potencia más fuerte. Sin la regla, tres líderes juntos son un
+  //  +30% que ningún número del catálogo anticipa.
+  "enemyTraits": {
+    "enrageHpPercent": 35,
+    "enrageSpeedPercent": 15,
+    "enrageTicks": 90,
+    "finalBossEnrageSpeedPercent": 10,
+
+    "impulsiveHpPercent": 30,
+    "impulsiveSpeedPercent": 20,
+
+    "leaderSpeedPercent": 10,
+    "leaderRadiusThousandths": 1500
+  }
+}
