@@ -171,20 +171,25 @@ public sealed class Revalidator(Database db, ServerData datos, SimulationDataCat
         int cuantas, CancellationToken ct)
     {
         var ids = new List<long>();
+        var hashes = catalog.KnownHashes.ToArray();
+        string placeholders = string.Join(", ", hashes.Select((_, i) => $"@hash{i}"));
 
         await using (var conn = await db.OpenAsync(ct))
         await using (var cmd = new MySqlCommand(
-            """
+            $"""
             SELECT id FROM runs
             WHERE validado = 0
               AND motivo_cierre IN ('gano', 'perdio')
               AND log_acciones IS NOT NULL
               AND log_truncado = 0
+              AND datos_hash IN ({placeholders})
             ORDER BY id
             LIMIT @cuantas
             """, conn))
         {
             cmd.Parameters.AddWithValue("@cuantas", cuantas);
+            for (int i = 0; i < hashes.Length; i++)
+                cmd.Parameters.AddWithValue($"@hash{i}", hashes[i]);
 
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
