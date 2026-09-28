@@ -36,7 +36,8 @@ public sealed class ApiConfig
     /// reproducible ni comparable con las demás. <b>Rechazarla al empezar es
     /// infinitamente mejor que rechazarla después de tres horas.</b>
     ///
-    /// <para>Vacío = no se verifica, para desarrollo.</para>
+    /// <para>Vacío = no se hace una segunda comprobación de configuración.
+    /// /run/start siempre verifica contra el hash calculado de SimulationData.</para>
     /// </remarks>
     public string DataHash { get; init; } = "";
 
