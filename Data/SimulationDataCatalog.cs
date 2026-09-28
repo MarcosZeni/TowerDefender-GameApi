@@ -17,6 +17,7 @@ public sealed class SimulationDataCatalog
     private readonly Dictionary<string, BalanceData> _byHash = new(StringComparer.Ordinal);
 
     public BalanceData Current { get; }
+    public IReadOnlyCollection<string> KnownHashes => _byHash.Keys;
 
     public SimulationDataCatalog(string root, int currentVersion)
     {
