@@ -1,0 +1,66 @@
+{
+  // ---------------------------------------------------------------------------
+  //  Las nueve clases de combate de Argentum Online.
+  //
+  //  ⚠ NO existe "arquero": el que tira flechas es el Cazador.
+  //  ⚠ Las trabajadoras quedan afuera —leñador, minero, pescador, herrero,
+  //    carpintero, sastre—: no pelean, y este juego es solo pelear.
+  //
+  //  REGLA DEL DAÑO: más alcance, menos golpe. Un melee ve pasar a cada bicho
+  //  una sola vez por delante; uno de rango cubre media ruta y le pega a todo lo
+  //  que camina por ella. Si encima pegara igual, el de rango jugaría solo.
+  //
+  //  ⚠ Este archivo es ENTRADA de la simulación y entra al hash de /run/start.
+  //  Cambiar un número acá vuelve irreplicables las corridas viejas: es una
+  //  TEMPORADA NUEVA del ranking. Ver Doc\Datos\05-temporadas.md.
+  //
+  //  ⚠ "version" es el MISMO número en los ocho archivos del hash, y el que el
+  //  cargador lee de verdad es el de enemigos.json. Está acá por consistencia:
+  //  estuvieron desparejos —unos en 1 y otros en 2— y eso hacía pensar que cada
+  //  archivo llevaba su propia versión.
+  // ---------------------------------------------------------------------------
+  "version": 3,
+
+  // Puntos porcentuales de daño que suma cada nivel por encima del 1.
+  //
+  // ⚠ ESTE NÚMERO SOLO FUNCIONA POR LA ESCALA INTERNA. Con daño base entero y
+  // chico, el truncamiento se comía niveles enteros: un cazador de 4 no subía
+  // nada en los niveles 2, 3, 4 ni 6 (4 × 1,08 = 4,32 → 4), y lo mismo pasaba en
+  // 3 de 5 niveles de Clérigo, Guerrero, Ladrón y Bardo. Era la anomalía P0 de
+  // la propuesta V2.
+  //
+  // Se arregló escalando el daño ×100 adentro de la simulación —centésimas de
+  // punto, ver Ints.HundredthsPerPoint— y NO subiendo este número. Si algún día
+  // alguien saca la escala, hay que volver a mirar acá.
+  "extraDamagePerLevel": 8,
+
+  // Nivel máximo y, a la vez, slots de perk por clase: cada nivel abre uno.
+  "perkSlotsPerClass": 6,
+
+  // Alcance en CELDAS. La simulación lo compara al cuadrado porque no calcula
+  // raíces (JUGABILIDAD.md §4.2).
+  //
+  // ⚠ alcance 1 NO cubre las diagonales: una celda en diagonal queda a
+  // √2 ≈ 1,41 y no entra. Por eso el mínimo del roster es 2.
+  //
+  // ⚠ Se escribe en celdas y la simulación lo lleva a MILÉSIMAS de celda
+  // (propuesta V2). Antes el alcance efectivo se redondeaba a celdas enteras, y
+  // eso mataba los perks de alcance: +15% sobre 2 daba 2,3 y truncaba a 2. Con
+  // milésimas, 2000 + 15% son 2300 y el círculo crece de verdad.
+  //
+  // "support": pega poco a propósito, su valor está en lo que le hace al resto
+  // del equipo. Se usa para garantizar que la elección inicial traiga al menos
+  // una clase capaz de sostener sola una defensa.
+  "classes": [
+    // DPS = dano × 30 / cadencia.
+    { "class": "Mage",     "cost": 100, "damage": 10, "range": 4, "cadence": 30, "support": false },
+    { "class": "Cleric",  "cost":  80, "damage":  7, "range": 3, "cadence": 24, "support": true  },
+    { "class": "Warrior", "cost":  60, "damage":  7, "range": 2, "cadence": 18, "support": false },
+    { "class": "Assassin",  "cost":  90, "damage": 12, "range": 2, "cadence": 21, "support": false },
+    { "class": "Thief",   "cost":  50, "damage":  5, "range": 2, "cadence": 18, "support": false },
+    { "class": "Bard",    "cost":  70, "damage":  6, "range": 3, "cadence": 21, "support": true  },
+    { "class": "Druid",   "cost":  85, "damage":  8, "range": 3, "cadence": 27, "support": true  },
+    { "class": "Paladin",  "cost":  95, "damage": 13, "range": 2, "cadence": 24, "support": false },
+    { "class": "Hunter",  "cost":  75, "damage":  4, "range": 6, "cadence": 21, "support": false }
+  ]
+}
