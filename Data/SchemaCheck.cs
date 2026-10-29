@@ -36,6 +36,7 @@ public sealed class SchemaCheck(Database db)
         // migración 006 y no la 003: quien tenga la base vieja necesita correr
         // esa, no la que ya corrió.
         ("runs", ["tick_guardado", "actualizada", "plataforma"], "006_runs_progreso.sql"),
+        ("runs", ["datos_hash"], "007_runs_datos_hash.sql"),
 
         ("planos_cuenta", ["id_cuenta", "plano", "precio"], "004_planos_cuenta.sql"),
         ("intentos_login", ["ip", "nick", "exito", "cuando"], "005_intentos_login.sql"),

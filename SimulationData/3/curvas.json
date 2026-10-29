@@ -1,0 +1,728 @@
+{
+  // ---------------------------------------------------------------------------
+  //  Las curvas: la Torre, la corrida, la economía y cómo se arma cada oleada.
+  //
+  //  Es el archivo de la DIFICULTAD. Si hay un solo número que mirar para saber
+  //  cuán dura es una oleada, es el presupuesto de acá.
+  //
+  //  ⚠ Entra al hash de /run/start. Tocar esto es TEMPORADA NUEVA del ranking.
+  //
+  //  ⚠ "version" es el MISMO número en los ocho del hash; el que el cargador lee
+  //  de verdad es el de enemigos.json.
+  // ---------------------------------------------------------------------------
+  "version": 3,
+
+  // --- La Torre --------------------------------------------------------------
+  //
+  // ⚠ "Tower" NO es la unidad que ataca. Es lo que se defiende. La unidad que
+  // ataca es un DEFENSOR.
+  //
+  // ⚠ La Torre SE DEFIENDE SOLA. Un enemigo que llega y se queda pegado a ella,
+  // fuera del alcance de todos los defensores, frenaba la oleada PARA SIEMPRE:
+  // no moría, la oleada no se limpiaba, el bono no llegaba, y la corrida se
+  // convertía en ver caer 1.000 HP de a 5. Medido con el corredor: seeds
+  // clavadas 27.000 ticks en la oleada 1.
+  //
+  // Pega parejo y despacio, al MÁS VIEJO de los que la muerden: es una RED DE
+  // SEGURIDAD, no un defensor. Si pegara fuerte, no poner nada cerca de la Torre
+  // sería una estrategia, y la Torre es lo que se defiende, no con lo que se
+  // defiende.
+  "tower": {
+    "initialHp": 1000,
+    "damage": 20,
+    "cadenceTicks": 30
+  },
+
+  // --- La corrida ------------------------------------------------------------
+  //
+  // ⚠ SON 100 OLEADAS Y TERMINA AHÍ, matando al jefe final del área 8. No hay
+  // modo sin fin y no hay área 9. Las oleadas se numeran 1 a 100 CORRIDAS, no
+  // por área: el área es una propiedad de la oleada, no un contador que se
+  // reinicia.
+  //
+  // "lastWavePerArea": el reparto de las 100 entre las ocho. NO ES PAREJO Y NO
+  // TIENE QUE SERLO: cada área dura lo que su bestiario tiene para dar.
+  //
+  // ⚠ LAS ÁREAS BAJAS SE ACORTARON (2026-09-07). Antes eran [12, 24, 37, 50, 62,
+  // 75, 87, 100] —12 o 13 cada una, parejo— y eso era el bug de ritmo más grande
+  // del juego: las áreas 1 y 2 se llevaban VEINTICUATRO OLEADAS, un cuarto de la
+  // corrida, para cubrir de 30 a 111 de HP. Hasta la oleada 24 el enemigo más
+  // duro que veía el jugador era un Cerdo de 102, mientras él ya había subido
+  // niveles, comprado perks y equipado armas. Medido: el presupuesto efectivo
+  // subía de 1331 en la oleada 12 a 1828 en la 24 —un 37% en doce oleadas— y la
+  // oleada 13 salía MÁS FÁCIL que la 12 (1181 contra 1331), porque el tope del
+  // presupuesto es el costo medio del pool y el pool del área 2 costaba casi lo
+  // mismo que el del área 1.
+  //
+  // Con [6, 13, 26, 39, 52, 66, 83, 100] la oleada 24 pasa a 2809 de presupuesto
+  // —+54%— y el bajón de la 13 desaparece. El Lobo aparece en la 14 en vez de la
+  // 25 y el Zombie en la 27 en vez de la 38.
+  //
+  // ⚠ Queda UN bajón, chico y estructural: la oleada 40 —la primera del área 5—
+  // cae de 5740 a 5553, un 3%. No es el bestiario: es que "equivalentCapMin"
+  // reinicia el capEq de 65 a 50 al cambiar de área, y el área 5 (471-727 de HP)
+  // no es lo bastante más cara que la 4 (304-433) para tapar ese 23%. Se probaron
+  // seis repartos y el bajón se MUEVE de oleada pero no se va: sale del capEq, no
+  // de dónde estén los cortes. Se deja porque en esa oleada aparecen bichos que
+  // antes no existían —la dificultad que se ve sube aunque el presupuesto baje 3%—
+  // y porque perseguirlo cuesta más cambios de temporada de los que vale.
+  //
+  // Las áreas altas se llevan la de más —17 las dos últimas— y eso también es a
+  // propósito: es donde el bestiario tiene rango de HP para estirar (de 4193 a
+  // 8400 en la 8) y donde el jugador ya tiene con qué experimentar. Las bajas no
+  // lo tienen: el área 1 entera va de 30 a 76.
+  //
+  // La última tiene que ser igual a wavesPerRun.
+  //
+  // ⚠ Cada oleada de esta lista TRAE JEFE, y el jefe es la única fuente de perks
+  // de Oro: exactamente ocho oportunidades por corrida. Eso es lo que hace que
+  // matar al jefe valga más que sobrevivirlo, y lo que le pone techo a cuántos
+  // Oro puede juntar un jugador — que a su vez es lo que hace que la fusión sea
+  // una decisión y no un trámite.
+  "run": {
+    "wavesPerRun": 100,
+    "areaCount": 8,
+    "lastWavePerArea": [6, 13, 26, 39, 52, 66, 83, 100],
+    "wavesBetweenChoices": 3,
+    "preparationSeconds": 30,
+
+    // ⚠ CUÁNTAS CLASES SE DESBLOQUEAN GRATIS. De ahí en más, RECLUTAR SE COMPRA.
+    //
+    // ⚠ PASÓ DE 1 A 2, y la segunda entra SELLADA hasta "sealedUnlockWave".
+    //
+    // Con una sola gratis, el arranque era una decisión de un solo eje —cuál me
+    // llevo— y la corrida entera dependía de que esa clase sirviera para las
+    // primeras oleadas. Con dos, el jugador elige además EN QUÉ ORDEN: con cuál
+    // limpia el principio y cuál espera. El sello es lo que hace que la segunda
+    // sea una decisión y no simplemente el doble de tablero: sin él, empezar con
+    // dos clases duplica el ancho antes de la primera compra y desarma el primer
+    // tramo de la curva.
+    //
+    // Lo gratis sigue siendo SOLO el arranque, que es el reemplazo directo de la
+    // pantalla de elección: la primera tienda ofrece solo clases, con al menos
+    // una ofensiva garantizada entre las opciones. Sin eso el jugador arranca con
+    // cero oro y cero clases y no se destraba nunca.
+    //
+    // ⚠ Y la que NO se toma no desaparece: queda a su precio, comprable con el
+    // oro inicial que entrega la primera clase. Esa es toda la diferencia con la
+    // vieja pantalla de elección, donde tomar una borraba las otras dos.
+    //
+    // Ponerlo en 0 dejaría la primera tienda sin nada gratis y el cargador lo
+    // rechaza. Subirlo a 3 con "initialClassOffers" en 3 también: regalar todo lo
+    // que se ofrece no es elegir, es repartir.
+    "freeClasses": 2,
+
+    // ⚠ CUÁNTAS CLASES MUESTRA LA TIENDA DEL ARRANQUE. Solo esa: el resto usan
+    // "shop.slots", que son 7.
+    //
+    // Antes el arranque usaba las 7 ranuras de una tienda normal y regalaba una:
+    // la decisión importante quedaba diluida en una lista larga que además el
+    // jugador todavía no sabe leer —no conoce las clases, no conoce los precios y
+    // no tiene oro—. Tres ofertas y dos gratis es una elección que se abarca de un
+    // vistazo, y la que sobra queda comprable.
+    //
+    // Tiene que ser MAYOR que "freeClasses" o el cargador tira.
+    "initialClassOffers": 3,
+
+    // ⚠ EN QUÉ OLEADA SE ABRE SOLA LA SEGUNDA CLASE GRATIS.
+    //
+    // Es automático: no hay acción del jugador, así que no entra al log y el
+    // servidor lo reproduce solo. El sello se levanta CUANDO ABRE LA TIENDA, no
+    // en un tick suelto, porque la preparación es el único momento en que el
+    // jugador puede hacer algo con la clase que se le acaba de abrir.
+    //
+    // Por eso tiene que ser múltiplo de "wavesBetweenChoices" —el cargador lo
+    // exige—: un número intermedio se correría solo hasta la tienda siguiente y
+    // el dato mentiría sobre cuándo pasa.
+    //
+    // 3 es la primera tienda después del arranque. Más tarde —6 o 9— alarga el
+    // tramo de una sola clase, que es justo donde la curva de oleadas todavía
+    // perdona poco: medir con --balance antes de moverlo.
+    "sealedUnlockWave": 3,
+
+    // ⚠ PASADAS LAS GRATIS, LA ELECCIÓN SE COBRA — con este descuento sobre el
+    // precio de comprar lo mismo por el otro camino.
+    //
+    // Un nivel regalado es el power-up más grande del juego sin perder nada: abre
+    // un slot de perk, sube los stats de TODAS las fichas de esa clase que ya
+    // estén puestas, y no cuesta una moneda. Cada tres oleadas, gratis, eso
+    // vaciaba de sentido al sumidero de oro: comprar el nivel 4 sale 4.800 y la
+    // elección lo regalaba.
+    //
+    // Descuento y no precio lleno porque la elección igual es peor que la tienda
+    // en una cosa concreta: NO SE ELIGE QUÉ SALE. La tienda ofrece cuatro cosas
+    // de seis categorías y esto tres al azar, así que pagar lo mismo por menos
+    // agencia sería un mal negocio y el jugador aprendería a saltearla siempre.
+    //
+    // 60 es el mismo número que la devolución al vender: pagás el 60% de lo que
+    // sale por afuera, y el 40% que ahorrás es lo que compra el sorteo.
+    //
+    // En 100 la elección deja de tener ventaja y se vuelve una tienda peor; en 0
+    // vuelve a ser gratis y con ella el problema. La oferta de Oro de un jefe NO
+    // pasa por acá: es un drop, no una compra.
+    "choiceDiscountPercent": 60
+  },
+
+  // --- Defensores ------------------------------------------------------------
+  //
+  // ⚠ EL NIVEL ABRE CAPACIDAD, LOS DROPS LA LLENAN.
+  //
+  // "backpackSlots" son compartidos entre perks y armas. "gearSlotsPerClass"
+  // es UNO, el arma: concentrarlo hace la decisión de equipar nítida —hay un
+  // solo lugar, y lo que entra saca lo que estaba— y deja que las armas sean
+  // mucho más locas sin desbalancear.
+  //
+  // ⚠ Sacar un perk ya equipado LO DESTRUYE, no vuelve a la mochila. El equipo
+  // sí se vende.
+  //
+  // "defenderSellPercent" pasó de 50 a 60 (propuesta V2). Vender y reubicar es
+  // la corrección de un error de colocación, y castigarla a la mitad hacía que
+  // convenga dejar un defensor mal puesto antes que moverlo. Las referencias van
+  // por ahí o más arriba: Kingdom Rush devuelve el 60% y BTD6 el 70%.
+  "defenders": {
+    "backpackSlots": 15,
+    "gearSlotsPerClass": 1,
+    "defenderSellPercent": 60,
+    "weaponSellPercent": 100
+  },
+
+  // --- Economía --------------------------------------------------------------
+  //
+  // ⚠ EL CLIENTE NUNCA MANDA ORO NI PRECIOS. Esto es lo que la simulación usa
+  // para derivarlos; el servidor calcula lo mismo al revalidar.
+  //
+  // "startingGoldTokens": el oro de arranque es este múltiplo del costo de la
+  // clase que tocó primero. Antes eran 200 fijos, y eso era una lotería: 200
+  // compraban cuatro ladrones o dos cazadores. Atarlo al costo de la clase lo
+  // vuelve parejo — siempre alcanza para exactamente dos fichas.
+  //
+  // "goldPerCalledEnemy": adelantar la oleada paga por EL RIESGO, que es
+  // cuántos bichos te quedan encima cuando llamás a la siguiente. El tope existe
+  // porque sin él una oleada tardía sin limpiar pagaría más que jugarla bien.
+  //
+  // ⚠ ADELANTAR OLEADA no es un lujo: sin esa mecánica el desempate del ranking
+  // por ticks no mide nada, y la punta de la tabla deja de ser una tabla de
+  // velocidad.
+  //
+  // ⚠ "goldMultiplierPerArea" desacopla el escalado de los ENEMIGOS del escalado
+  // del DINERO (Economia_Propuesta). El presupuesto de oleada es cuadrático, así
+  // que el oro que sueltan los bichos crecía con él: en las áreas tardías el
+  // jugador terminaba con el tablero lleno y oro sobrando sin nada que comprar,
+  // que es un recurso que dejó de ser un recurso.
+  //
+  // Un porcentaje por área, aplicado al oro de kill. Las dos primeras quedan al
+  // 100: el arranque es donde el oro de verdad aprieta, y recortarlo ahí castiga
+  // al que está aprendiendo. Baja de a 10 puntos por área a partir de la tercera.
+  //
+  // Es el patrón de BTD6, que reduce el cash por pop desde la ronda 51 en vez de
+  // subir los precios: bajar la entrada mantiene legibles los precios de la
+  // tienda, subir los precios los vuelve una tabla que hay que releer.
+  //
+  // ⚠ "levelUpPriceBase" ES EL SUMIDERO DE ORO DE LA CORRIDA. Precio de comprar
+  // el nivel N de una clase del roster: base × N². Medido con --balance 24, el
+  // jugador imaginario terminaba con ~127.000 de oro sin gastar, el tablero lleno
+  // y la mochila llena: el tope de lo que se puede TENER llegaba mucho antes que
+  // el de lo que se puede PAGAR. Recortar el ingreso no lo arreglaba —con la
+  // mitad del oro seguían sobrando 60.000— porque el problema no era cuánto
+  // entra, era que no había en qué gastarlo.
+  //
+  // Cuadrático y no plano, y eso es lo que protege la elección de cada tres
+  // oleadas: con 300 de base, el nivel 2 sale 1.200 —más de lo que hay en el
+  // bolsillo en el área 1— y llevar una clase de 1 a 6 sale 27.000. Temprano el
+  // oro se va al tablero, tarde se va acá.
+  //
+  // ⚠ El oro compra PROFUNDIDAD, NO ANCHO: solo sube clases que ya están.
+  // Contratar sigue siendo exclusivo de la pantalla de elección, así que esa
+  // mitad de la decisión no se puede comprar.
+  //
+  // ⚠ La lista tiene que traer exactamente "areaCount" números.
+  "economy": {
+    "startingGoldTokens": 2,
+    "goldPerCalledEnemy": 12,
+    "callGoldCap": 400,
+    "levelUpPriceBase": 300,
+    "goldMultiplierPerArea": [100, 100, 90, 80, 70, 60, 50, 40]
+  },
+
+  // --- El presupuesto de la oleada ------------------------------------------
+  //
+  // presupuesto = base + cuadratico × n²   (n = número de oleada)
+  //
+  // ⚠ LA CURVA ES CUADRÁTICA A PROPÓSITO. Lineal es aburrido —la oleada 80 se
+  // siente igual que la 40— y exponencial se descontrola: a la oleada 100 el
+  // número deja de tener sentido y no hay defensa que alcance.
+  //
+  // La constante bajó de 50 a 35 cuando el oro inicial pasó a dos fichas. Con 20
+  // la oleada 1 traía UN bicho y no se entendía qué pasaba; con 35 da 44 de
+  // presupuesto, o sea dos. La cola cuadrática no se toca.
+  //
+  // ⚠ EL TOPE POR POOL (propuesta V2). La cuadrática cruza muy pronto lo que 60
+  // NPCs pueden absorber, y todo el exceso se volvía HP: un muro que crecía sin
+  // techo. El tope es "lo que cuestan capEq bichos promedio del pool", con capEq
+  // subiendo LINEAL de capEquivalenteMin a capEquivalenteMax DENTRO de cada
+  // área: la dificultad sigue subiendo, pero atada a lo que el área vende.
+  "budget": {
+    "base": 35,
+    "quadratic": 9,
+    "equivalentCapMin": 50,
+    "equivalentCapMax": 65
+  },
+
+  // --- Las otras curvas por oleada ------------------------------------------
+  //
+  // Todas son base + perWave × n, salvo donde diga otra cosa.
+  //
+  // ⚠ "bossDropBudget" es LINEAL mientras la del presupuesto de oleada es
+  // CUADRÁTICA, y eso es deliberado: si las dos crecieran igual, el jugador iría
+  // siempre al mismo ritmo que la dificultad y la corrida no se sentiría más
+  // dura nunca. Que la dificultad crezca más rápido que el equipo es lo que hace
+  // que la corrida TERMINE — que es el punto de que sean 100 oleadas y no
+  // infinitas. La diferencia la cubre el jugador jugando mejor.
+  //
+  // "shopItemBudget" es más chico que el del jefe a propósito: lo que se
+  // compra tiene que ser peor que lo que se gana matando al jefe, o matar al
+  // jefe deja de valer la pena.
+  //
+  // "clearGoldBonus" subió de 10 + n×6 a 20 + n×7 (Economia_Propuesta). Es la
+  // contrapartida del recorte de oro por kill de las áreas tardías: se mueve el
+  // ingreso desde "matar bichos" hacia "limpiar la oleada", que es lo que el
+  // juego quiere premiar. La cuenta da 27 en la oleada 1 y 104 en la 12, contra
+  // 16 y 82 de antes.
+  //
+  // "spawnIntervalTicks" y "npcPerkChance" son limitar(base + perWave×n, min, max)
+  // con perWave fraccionario escrito como divisor.
+  "perWaveCurves": {
+    "clearGoldBonus":       { "base": 20, "perWave": 7 },
+    "bossDropBudget":   { "base": 40, "perWave": 6 },
+    "shopItemBudget": { "base": 30, "perWave": 5 },
+
+    // Los spawns se aprietan con las oleadas, así que la presión no crece solo
+    // por cantidad sino por concentración. ticks = limitar(base - n/divisor, min, max).
+    "spawnIntervalTicks":   { "base": 45, "divisor": 3, "min": 8, "max": 45 },
+
+    // Sube con la corrida: más adelante, más bichos con perk.
+    // porcentaje = limitar(n / divisor, min, max).
+    "npcPerkChance":         { "divisor": 2, "min": 0, "max": 30 }
+  },
+
+  // --- La tienda rotativa de la corrida --------------------------------------
+  //
+  // ⚠ LA TIENDA AHORA SÍ VENDE ORO, y eso es un cambio de diseño, no un ajuste.
+  // Antes el jefe era la única fuente y la regla existía para que matarlo valiera
+  // algo. Lo que la reemplaza es más fino: el jefe sigue REGALANDO un Oro por
+  // área —ocho garantizados, gratis— y la tienda solo ofrece la POSIBILIDAD de
+  // comprar uno más, caro, compitiendo contra un nivel y contra el tablero. Matar
+  // al jefe sigue siendo la forma barata de conseguir comportamientos.
+  //
+  // La contrapartida está en "drops.bossGoldOptions", que bajó de 3 a 2: con la
+  // tienda vendiendo Oro además de ocho elecciones de tres, armar el Único que
+  // uno quiere dejaba de ser una apuesta.
+  //
+  // ⚠ LA TIENDA ABRE JUNTO A LA PANTALLA DE ELECCIÓN, no después de cada oleada.
+  // Cada "intervalWaves" oleadas —la 3, la 6, la 9…— o sea unas 33 veces en una
+  // corrida completa. Que las dos decisiones caigan juntas es lo que las pone a
+  // competir: la elección da poder gratis, la tienda lo cobra.
+  //
+  // El stock NO SE ACUMULA Y NO SE REPONE: lo que no se compró desaparece, y
+  // comprar una oferta no trae una quinta. Sin lo primero la tienda se vuelve una
+  // lista creciente que hay que revisar entera; sin lo segundo un jugador rico
+  // vacía el catálogo entero en una sola visita.
+  //
+  // --- Los pesos por categoría ----------------------------------------------
+  //
+  // ⚠ SE SORTEA PRIMERO LA CATEGORÍA Y DESPUÉS EL OBJETO. En una sola bolsa
+  // uniforme los Oro serían comunísimos —hay 22 nombres distintos contra 9
+  // clases— y agregar un perk nuevo cambiaría en silencio la probabilidad de
+  // todas las demás categorías.
+  //
+  // Los cinco primeros son los del análisis de la tienda rotativa. "weaponWeight"
+  // es el sexto y NO sale de ahí: el análisis no sabía que la tienda ya vendía
+  // armas. Sacarlas dejaría el generador de armas entero en ocho ítems por
+  // corrida —solo los del jefe— y todo el sistema de habilidades de arma se
+  // volvería contenido muerto. Los pesos son RELATIVOS, no porcentajes, así que
+  // el sexto no altera la proporción entre los otros cinco.
+  //
+  // ⚠ Cuando ya no quedan clases por reclutar, el peso de clase se reparte solo
+  // entre Bronce y Plata. Volcarlo a Oro y Planos haría que el late game vomite
+  // rarezas justo cuando el jugador ya tiene oro de sobra.
+  //
+  // --- Cuándo se habilita cada categoría ------------------------------------
+  //
+  // Un Oro en la oleada 3 es económicamente imposible y el jugador todavía no
+  // tiene con qué armar una build alrededor. Los mínimos coinciden con el primer
+  // jefe (oleada 12), que es cuando el sistema de comportamientos existe de
+  // verdad.
+  //
+  // --- Los precios ----------------------------------------------------------
+  //
+  // Todos son base + perWave × oleada. La escalera busca una SENSACIÓN:
+  //
+  //   Bronce      compra menor: se puede hacer sin romper un plan económico.
+  //   Plata/clase compra media: obliga a pensar, normalmente es accesible.
+  //   Oro         compra premium: obliga a renunciar a algo importante.
+  //   Plano       inversión: no da poder hoy, así que es más barato que el Oro.
+  //
+  // El Oro crece el doble de rápido que el Plata a propósito: en la oleada 50
+  // sale 2.400 contra los 2.700 que cuesta llevar una clase a nivel 3. Comprar un
+  // comportamiento compite casi exactamente con comprar profundidad, que es la
+  // tensión que la tienda existe para crear.
+  //
+  // ⚠ EL PRECIO DEL ORO ES UNIFORME, no por perk. Si Concentración se compra el
+  // 90% de las veces y Preparación el 5% al mismo precio, eso dice que los perks
+  // necesitan rebalance — con precios distintos ese síntoma queda tapado.
+  //
+  // "classPrice" recluta la CLASE, no un defensor puesto: después las fichas se
+  // siguen pagando a su costo base. El término × costoBase existe para que un
+  // mago no salga lo mismo que un ladrón, pero pesa poco (×2 sobre ~78 de media)
+  // para que las caras no queden fuera del mercado.
+  //
+  // ⚠ LOS ÚNICOS NO SE VENDEN NUNCA. La tienda vende ingredientes y
+  // conocimiento; el producto final se fabrica. Vender el Único borraría de un
+  // saque buscar los componentes, comprar el plano y decidir si conservarlos.
+  //
+  // --- LA PANTALLA DE ELECCIÓN SE FUSIONÓ ACÁ --------------------------------
+  //
+  // ⚠ "slots" PASÓ DE 4 A 7 y entró "levelWeight". Hasta acá había DOS ventanas
+  // pegadas en la misma pantalla con reglas OPUESTAS: la elección ofrecía tres
+  // cosas, se tomaba UNA y las otras dos desaparecían; la tienda ofrecía cuatro y
+  // solo se consumía la comprada. Para el jugador era una sola tienda de siete
+  // cartas, así que comprar un nivel y ver evaporarse otras dos ofertas se leía
+  // como un bug —y con razón: nada en la pantalla decía que esas tres eran otra
+  // cosa—.
+  //
+  // Ahora es una tienda sola. Comprar no toca a las demás, que es la regla que la
+  // tienda ya tenía y la que el jugador esperaba.
+  //
+  // Lo que se pierde es el descuento: la elección cobraba con
+  // "choiceDiscountPercent" a cambio de no dejar elegir QUÉ salía. En la tienda
+  // el jugador ve las siete y elige, así que el descuento no tiene con qué
+  // pagarse. "choiceDiscountPercent" quedó sin uso.
+  //
+  // ⚠ Y LA TIENDA NO REGALA NADA. Lo único gratis de toda la corrida es la clase
+  // del arranque, que reemplaza a la pantalla de elección inicial. "freeClasses"
+  // ya no reparte nada por oleada.
+  //
+  // ⚠ NO HAY "levelWeight" Y NO TIENE QUE HABERLO. Subir de nivel no es una
+  // categoría aparte: es la OTRA CARA de la ranura de clase. Lo que rota es la
+  // clase, y qué te ofrece de ella lo decide tu roster —reclutarla si no la
+  // tenés, subirla si la tenés, bloqueada si ya está al tope—. Con dos categorías
+  // separadas, la misma clase podía salir dos veces en la misma tienda con dos
+  // caras distintas.
+  "shop": {
+    "slots": 7,
+    "intervalWaves": 3,
+
+    // ⚠ SUBIÓ DE 24 A 44 y ya no se apaga con el roster completo: esta ranura
+    // ahora cubre reclutar Y subir de nivel, así que tiene candidatas siempre.
+    // Con el peso viejo, la mitad "profunda" de lo que era la pantalla de
+    // elección habría quedado convertida en una rareza.
+    "classWeight": 44,
+
+    "bronzeWeight": 30,
+    "silverWeight": 30,
+    "goldWeight": 8,
+    "blueprintWeight": 8,
+    "weaponWeight": 10,
+
+    // Del 7 en adelante el nivel ya no abre ranuras de perk, así que subirlo no
+    // aportaría nada. Al llegar acá la ranura de esa clase sale BLOQUEADA, no
+    // desaparece: que una clase esté terminada es información del roster.
+    // Coincide con "slotsPerkPorClase".
+    "maxLevelOnSale": 6,
+
+    "maxGoldOffers": 1,
+    "maxBlueprintOffers": 1,
+
+    // De las siete cartas, al menos estas tienen que poder aportarle a una clase
+    // que el jugador ya tiene. No hace falta que las siete sirvan —la
+    // incertidumbre es parte de la decisión— pero siete cartas muertas es una
+    // pantalla que no existe.
+    "minUsableOffers": 2,
+
+    "silverMinWave": 6,
+    "goldMinWave": 12,
+    "blueprintMinWave": 12,
+
+    // Si el jugador conoce un plano y tiene uno de sus dos Oro, la pieza que le
+    // falta entra al sorteo con este peso multiplicado; lo mismo con el plano de
+    // dos Oro que ya tiene. ×2 y no ×10: la build se puede PERSEGUIR, no
+    // garantizar.
+    "recipeWeightMultiplier": 2,
+
+    "bronzePerkPrice": { "base":  80, "perWave":  6 },
+    "silverPerkPrice": { "base": 240, "perWave": 18 },
+    "goldPerkPrice":   { "base": 600, "perWave": 36 },
+    "blueprintPrice":  { "base": 280, "perWave": 14 },
+    "classPrice":      { "base": 450, "perWave":  8, "classCostMultiplier": 2 }
+  },
+
+  // --- Los drops -------------------------------------------------------------
+  //
+  // ⚠ El bicho común tira bronce/plata y EL JEFE ES LA ÚNICA FUENTE DE ORO.
+  // ⚠ Los Únicos NO CAEN: se fusionan (ver planos.json).
+  //
+  // "commonChance" no sube con la oleada. Lo que sube es la CALIDAD, no la
+  // cantidad: más drops tarde solo llenarían la mochila más rápido, y la
+  // decisión de qué tirar se volvería constante en vez de puntual.
+  //
+  // 4% con ~40 bichos por oleada da 1,6 drops por oleada, o sea unos 20 por
+  // área. Con 15 lugares de mochila, eso aprieta recién entrando a la segunda
+  // área — que es exactamente el ritmo que el diseño quiere.
+  //
+  // --- Cómo se reparte el Oro (Drops_v2) ------------------------------------
+  //
+  // ⚠ EL JEFE OFRECE VARIOS Y EL JUGADOR ELIGE UNO. Con un solo Oro al azar por
+  // jefe y ocho jefes por corrida, ver los DOS componentes de una receta
+  // concreta era cuestión de suerte, y los Únicos eran una lotería en vez de un
+  // objetivo de build. Ofrecer varios y dejar elegir da agencia sin regalar
+  // poder: sigue saliendo un solo Oro por jefe.
+  //
+  // ⚠ "bossGoldOptions" BAJÓ DE 3 A 2 al entrar la tienda rotativa. Ocho
+  // elecciones de tres MÁS Oro comprable daba demasiada consistencia: casi
+  // cualquier partida podía armar el Único que quisiera. Con dos, la elección
+  // del jefe sigue existiendo y la tienda es la que paga por convertirla en
+  // certeza.
+  //
+  // "synergyWeight": si el jugador ya tiene un Oro que participa en un plano que
+  // conoce, su pareja entra al sorteo con este peso multiplicado. Es la mitad
+  // que hace que las recetas se puedan perseguir: la primera mitad la da que las
+  // recetas ahora se adivinan mirando el efecto (ver planos.json).
+  //
+  // "goldPoolSize": cuántos Oro distintos puede llegar a ver UNA corrida. El
+  // catálogo tiene 22 y ofrecer los 22 diluye las recetas y convierte cada jefe
+  // en 22 opciones casi equivalentes. El pool se arma en el primer jefe con las
+  // clases que el jugador tenga, y suma "goldPoolPerNewClass" al contratar una
+  // clase nueva — así contratar sigue abriendo cosas.
+  //
+  // ⚠ "finalBossDrops": false. El jefe de la oleada 100 NO suelta nada, y no es
+  // una mezquindad: la corrida TERMINA al matarlo, así que cualquier recompensa
+  // llega cuando ya no hay dónde usarla. Toda recompensa tiene que tener ventana
+  // real de uso.
+  //
+  // --- LOS JEFES TARDÍOS DEJAN LLEVAR DOS -----------------------------------
+  //
+  // ⚠ Esto SUBE el poder total de la corrida, que es lo que "ofrecer varios y
+  // llevarse uno" venía cuidando. Es a propósito y tiene un motivo de ritmo: en
+  // el área 5 el jugador ya tiene el roster casi armado, los planos aprendidos y
+  // la mochila llena de Oro que no puede equipar —la ranura de comportamiento es
+  // UNA—, así que el jefe entregaba una carta más para una pila que ya no
+  // entraba. Dos permiten cerrar una receta en un solo jefe, que es lo que hace
+  // que el tramo final tenga algo que perseguir.
+  //
+  // Las áreas tempranas NO cambian: ahí un segundo Oro se equiparía enseguida y
+  // adelantaría la curva de poder entera.
+  //
+  // "bossGoldPicksLate" tiene que ser MENOR que "bossGoldOptionsLate", o dejaría
+  // de haber elección: llevarse tres de tres es un reparto, no una decisión.
+  "drops": {
+    "commonChance": 4,
+    "bronzeChance": 70,
+    "bossGoldOptions": 2,
+    "bossGoldLateArea": 5,
+    "bossGoldOptionsLate": 3,
+    "bossGoldPicksLate": 2,
+    "synergyWeight": 3,
+    "goldPoolSize": 13,
+    "goldPoolPerNewClass": 2,
+    "finalBossDrops": false
+  },
+
+  // --- Mejorar perks: varios de un tier hacen uno del tier de arriba ---------
+  //
+  // ⚠ EXISTE PORQUE LA MOCHILA SE LLENA DE BASURA, no porque falte poder. Con
+  // "commonChance" 4 y hasta 60 bichos por oleada caen del orden de 100 Bronce
+  // y 40 Plata, y los lugares son 15: pasada la oleada 20 el jugador tiene la
+  // mochila llena de números que no va a equipar nunca y TODO drop posterior cae
+  // al vacío en silencio. Agrandar la mochila no era la salida —convierte "qué
+  // me sirve" en una planilla, que es justo lo que el tope de 15 evita—; darle
+  // salida a lo que sobra, sí.
+  //
+  // "bronzeToSilver" NO lleva tope y no lo necesita: Bronce y Plata son números,
+  // se apilan, y su abundancia no es lo que el balance protege.
+  //
+  // ⚠ "maxCraftedGoldPerRun" ES LO QUE SOSTIENE LA ECONOMÍA DEL ORO. Todo el
+  // resto del juego está construido sobre "el jefe es la fuente de Oro, ocho por
+  // corrida, y la tienda como mucho uno por visita": los Únicos cuestan DOS Oro
+  // justamente porque hay pocos. Sin tope, a 4 × 3 = 12 Bronce por Oro y ~100
+  // Bronce por corrida, la mejora entrega casi tanto Oro como los ocho jefes
+  // juntos y fusionar deja de costar algo.
+  //
+  // El 2 es deliberadamente menos de lo que un jefe da: la mejora es la salida
+  // del que junta sobras, nunca el camino principal al Oro. En 0 se apaga esa
+  // mitad de la mecánica sin tocar código, y Bronce → Plata sigue andando.
+  //
+  // El Oro que sale de una mejora se sortea del POOL DE LA CORRIDA y SIN el peso
+  // de sinergia: perseguir una receta concreta sigue siendo privilegio del jefe,
+  // que es el que la ofrece de a dos para elegir.
+  "upgrades": {
+    "bronzeToSilver": 4,
+    "silverToGold": 3,
+    "maxCraftedGoldPerRun": 2
+  },
+
+  // --- Cómo se arma la oleada con ese presupuesto ---------------------------
+  //
+  // ⚠ UNA OLEADA NO ES UNA LISTA DE BICHOS ESCRITA A MANO. Es un presupuesto y
+  // una lista de permitidos, y el RNG sembrado con la seed del servidor lo gasta
+  // comprando. De ahí salen tres cosas: la seed hace trabajo real (misma
+  // dificultad, distinta composición), el ranking sigue comparable (el
+  // presupuesto es idéntico para todos, así que REROLLEAR LA SEED NO SIRVE), y
+  // el balance se toca en un número y no reescribiendo veinte listas.
+  //
+  // "maxNpcs" existe porque UNA OLEADA DE MIL BICHOS NO ES DIFÍCIL: ES LARGA. El
+  // presupuesto crece con el cuadrado y el costo del bicho más caro sube apenas.
+  // Sin tope, la oleada 55 compraba más de mil enemigos y tardaba media hora en
+  // desfilar con la Torre intacta. Medido: corridas clavadas contra el techo de
+  // 700.000 ticks.
+  //
+  // "currentAreaWeight" / "previousAreaWeight": los bichos de la zona previa siguen
+  // apareciendo un rato. Suaviza el salto entre áreas —que si no se siente como
+  // un muro— y le da al jugador la satisfacción de ver cómo lo que antes lo
+  // mataba ahora cae de un golpe. Pesan menos para que el área nueva domine.
+  //
+  // ⚠ EL PESO DEL ÁREA ANTERIOR SE DESVANECE, no es constante. Con peso fijo el
+  // pool cambiaba de composición de golpe al cruzar el borde, y como el tope del
+  // presupuesto es el costo medio del pool, el presupuesto saltaba entre +19% y
+  // +56% de una oleada a la otra: el equivalente a diez o veinte oleadas de
+  // crecimiento normal, entregadas de una. Medido con --balance: dos tercios de
+  // las corridas morían exactamente en la primera oleada de un área.
+  //
+  // "previousAreaWeightFirst" es el peso en la PRIMERA oleada del área y
+  // "previousAreaWeight" el de régimen; entre las dos hay una recta de
+  // "previousAreaFadeWaves" oleadas. Con 110 contra los 40 del área nueva, la
+  // oleada de estreno es mayormente conocida y trae unos pocos bichos nuevos, que
+  // es cómo se presenta un área: primero se los ve, después aprietan.
+  //
+  // "npcCost": derivado de los stats en vez de escrito a mano por criatura. Si
+  // la fórmula es buena, AGREGAR UN BICHO NUEVO NO OBLIGA A REBALANCEAR NADA. El
+  // HP pesa más que el daño porque en un tower defense aguantar es lo que cuesta
+  // matar; el daño solo importa si llega a la Torre. La velocidad entra porque
+  // un bicho rápido pasa menos tiempo bajo fuego.
+  "wave": {
+    "maxNpcs": 60,
+    "currentAreaWeight": 40,
+    "previousAreaWeight": 15,
+    "previousAreaWeightFirst": 110,
+    "previousAreaFadeWaves": 8,
+    "npcCost": { "hpDivisor": 4, "maxDamageDivisor": 2, "speedDivisor": 8 },
+    "defaultSpawnInterval": 30,
+
+    // --- La FORMA en que entra la oleada -------------------------------------
+    //
+    // ⚠ Esto NO toca el HP, ni el oro, ni el presupuesto. Solo cambia la
+    // separación temporal entre NPCs CONSERVANDO EL PROMEDIO, así que la oleada
+    // dura aproximadamente lo mismo y no es una palanca de dificultad encubierta.
+    //
+    // Lo que sí cambia es el valor RELATIVO de casi todo el catálogo: en ráfaga,
+    // splash, cadena y quemadura valen el doble y el single target sufre; en
+    // uniforme pasa lo contrario, y Concentración y el targeting «más fuerte»
+    // toman valor. Es la lección de Rogue Tower: que los enemigos lleguen
+    // separados o juntos altera qué torres sirven, sin tocar una estadística.
+    //
+    // Los números son PORCENTAJES del intervalo base de la oleada:
+    //
+    //   uniforme  100 - 100 - 100 - 100          (promedio 100)
+    //   parejas    50 - 150 -  50 - 150          (promedio 100)
+    //   ráfaga     60 -  60 -  60 -  60 - 260    (promedio 100)
+    //
+    // ⚠ Los promedios TIENEN que dar 100. Si no dan, la formación se convierte en
+    // una oleada más corta o más larga y eso sí es dificultad — encubierta y sin
+    // que aparezca en el presupuesto, que es el único número que se mira.
+    //
+    // La formación la sortea la seed una vez por oleada, con estos pesos.
+    "spawnFormations": {
+      "uniformWeight": 50,
+      "pairsWeight": 30,
+      "burstWeight": 20,
+
+      "pairShortPercent": 50,
+      "pairLongPercent": 150,
+
+      "burstSize": 5,
+      "burstShortPercent": 60,
+      "burstLongPercent": 260
+    }
+  },
+
+  // --- Los perks de los NPCs -------------------------------------------------
+  //
+  // ⚠ QUE EL PERK SE PAGUE DEL MISMO PRESUPUESTO es lo que impide que buffear
+  // descontrole la dificultad: una oleada con perks trae MENOS BICHOS, no los
+  // mismos más fuertes. Así el presupuesto sigue siendo el único número que hay
+  // que mirar.
+  //
+  // ⚠ Los modificadores TIENEN QUE VERSE EN PANTALLA: un lobo blindado que se ve
+  // igual que un lobo normal es una mecánica invisible.
+  //
+  // Números de la propuesta V2: escalones más chicos, más caros y CON TECHO. Los
+  // viejos (+50% por 12, sin tope) fabricaban muros de HP aleatorios en la mitad
+  // de la corrida.
+  //
+  // "healthChanceInRoll": cuando un NPC gana la tirada de perk, este % va a
+  // vida y el resto a velocidad.
+  // "speedChanceInLeftover": al repartir el presupuesto que no entró en NPCs
+  // nuevos, esta es la probabilidad de que la pasada vaya a velocidad.
+  //
+  // ⚠ La velocidad tiene techo porque UN BICHO LO BASTANTE RÁPIDO CRUZA EL MAPA
+  // ENTRE DOS DISPAROS y no hay defensa que lo toque.
+  //
+  // --- Los dos RASGOS, que no son números -----------------------------------
+  //
+  // Vida y velocidad suben una estadística. Estos dos cambian una SITUACIÓN, y
+  // por eso se pagan del mismo presupuesto pero se tiran aparte y una sola vez
+  // por NPC.
+  //
+  // "impulsive": al bajar del 30% de vida acelera un 20%, UNA sola vez. Tiene
+  // varias respuestas —Oportunista, focus fire, slow, burst, defensa cerca de la
+  // Torre— así que no es un enemigo lock-and-key: la recomendación de Defender's
+  // Quest es evitar los bichos que admiten una única respuesta correcta.
+  //
+  // "leader": aura de +10% de velocidad a los enemigos a menos de 1,5 celdas de
+  // ruta. No apila con otro líder y desaparece al morir, así que crea un objetivo
+  // PRIORITARIO sin agregar resistencias ni inmunidades — que es lo que hace que
+  // la composición de la oleada importe además del HP individual.
+  //
+  // ⚠ Las chances son bajas y el costo alto a propósito: son la SAL de la oleada.
+  // Un líder en cada oleada deja de ser un objetivo prioritario y se vuelve otro
+  // número de velocidad.
+  "npcPerks": {
+    "healthCost": 20,
+    "speedCost": 15,
+    "healthStep": 25,
+    "speedStep": 8,
+    "maxHealth": 200,
+    "maxSpeed": 64,
+    "healthChanceInRoll": 50,
+    "speedChanceInLeftover": 25,
+
+    "impulsiveCost": 12,
+    "impulsiveChance": 14,
+    "leaderCost": 30,
+    "leaderChance": 5,
+    "maxLeadersPerWave": 3
+  },
+
+  // --- El jefe ---------------------------------------------------------------
+  //
+  // El jefe se descuenta ANTES de comprar el resto y aparece último. Al revés,
+  // una oleada con jefe traería la misma cantidad de bichos MÁS el jefe, y sería
+  // un salto de dificultad y no un cambio de forma.
+  //
+  // Se lleva parte de lo que sobró como vida extra, CON TECHO (propuesta V2): el
+  // jefe es fuerte por diseño, no por residuo del presupuesto. Antes era
+  // sobrante/4 sin tope y en las áreas tardías salían jefes con miles de por
+  // ciento de HP.
+  // ⚠ El jefe de la ÚLTIMA área se elige por NOMBRE y no por HP: matarlo es cómo
+  // se gana la corrida, y ese momento tiene que ser reconocible. Por HP crudo el
+  // más duro del área 8 es el Golem, que como final de cien oleadas no dice nada.
+  //
+  // Se busca por coincidencia parcial en el bestiario. Si no está —porque cambió
+  // el filtro del importador— se cae al más duro del área, que es lo correcto:
+  // mejor un final genérico que una corrida que no se puede terminar.
+  // Vacío = siempre el más duro.
+  "boss": {
+    "extraHealthDivisor": 8,
+    "maxExtraHealth": 150,
+    "finalBossName": "Dragón Rojo"
+  }
+}

@@ -118,11 +118,17 @@ if (string.IsNullOrWhiteSpace(connectionString))
 // jugador, semanas después.
 // -----------------------------------------------------------------------------
 var datos = ServerDataLoader.Load(ServerDataLoader.DefaultFolder);
+var simulation = new SimulationDataCatalog(
+    Path.Combine(AppContext.BaseDirectory, "SimulationData"), config.DataVersion);
+if (!string.IsNullOrEmpty(config.DataHash) &&
+    !string.Equals(config.DataHash, simulation.Current.Hash, StringComparison.Ordinal))
+    throw new InvalidOperationException("DataHash configurado difiere de los JSON de simulación.");
 
 var database = new Database(connectionString);
 var gate = new HashGate(config.Security);
 
 builder.Services.AddSingleton(datos);
+builder.Services.AddSingleton(simulation);
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton(config.Security);
 builder.Services.AddSingleton(database);
@@ -131,6 +137,7 @@ builder.Services.AddSingleton(new PasswordHasher(config.Security));
 builder.Services.AddSingleton(new AccountRepository(database));
 builder.Services.AddSingleton(new TokenRepository(database));
 builder.Services.AddSingleton(new RunRepository(database));
+builder.Services.AddSingleton(new Revalidator(database, datos, simulation));
 builder.Services.AddSingleton(new LoginAttemptRepository(database));
 
 // -----------------------------------------------------------------------------
@@ -276,6 +283,19 @@ else if (schema.Problems.Count > 0)
         "    ... y así con las demás, en orden numérico.");
 
     return 1;
+}
+
+// Entrada operativa explícita: no se expone HTTP ni se aceptan argumentos
+// arbitrarios. Requiere acceso al proceso y a la base de datos del servidor.
+if (args.Length == 2 && args[0] == "--revalidate-pending")
+{
+    if (!int.TryParse(args[1], out int count) || count is < 1 or > 100)
+        throw new ArgumentException("--revalidate-pending requiere un entero entre 1 y 100.");
+
+    var validator = app.Services.GetRequiredService<Revalidator>();
+    foreach (var result in await validator.RevalidatePendingAsync(count, CancellationToken.None))
+        log.LogInformation("Run {RunId}: {Detail}", result.IdRun, result.Detalle);
+    return 0;
 }
 
 app.Run();

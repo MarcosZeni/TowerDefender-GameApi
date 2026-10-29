@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "legend": "E entrada · # ruta · . colocable · X bloqueado · T la Torre",
+  "note": "Se dibuja con Scenes/LayoutEditor.tscn o lo genera --generar-layouts. Se puede corregir a mano, pero después hay que pasarlo por --validar-layouts.",
+  "width": 20,
+  "height": 11,
+  "routeLength": 28,
+  "valid": true,
+  "rows": [
+    "XXXXXXXXXXXXXXXXXXXX",
+    "XE#.XXXXXX.......XXX",
+    "X.#.XXXXXX.######TXX",
+    "X.#.XXXXXX.#.....XXX",
+    "X.#........#.XXXXXXX",
+    "X.#######..#.XXXXXXX",
+    "X.......#..#.XXXXXXX",
+    "XXXXXXX.####.XXXXXXX",
+    "XXXXXXX...XX.XXXXXXX",
+    "XXXXXXXXXXXXXXXXXXXX",
+    "XXXXXXXXXXXXXXXXXXXX"
+  ]
+}

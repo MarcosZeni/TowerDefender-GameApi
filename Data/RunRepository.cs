@@ -54,7 +54,7 @@ public sealed class RunRepository(Database db)
     /// perdida.</para>
     /// </remarks>
     public async Task<(long IdNueva, long? IdAbandonada)> AbrirAsync(
-        long idCuenta, ulong seed, int datosVersion, string plataforma, CancellationToken ct)
+        long idCuenta, ulong seed, int datosVersion, string datosHash, string plataforma, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -89,13 +89,14 @@ public sealed class RunRepository(Database db)
 
         await using (var abrir = new MySqlCommand(
             """
-            INSERT INTO runs (id_cuenta, seed, datos_version, plataforma, iniciada)
-            VALUES (@cuenta, @seed, @version, @plataforma, UTC_TIMESTAMP(3))
+            INSERT INTO runs (id_cuenta, seed, datos_version, datos_hash, plataforma, iniciada)
+            VALUES (@cuenta, @seed, @version, @hash, @plataforma, UTC_TIMESTAMP(3))
             """, conn, tx))
         {
             abrir.Parameters.AddWithValue("@cuenta", idCuenta);
             abrir.Parameters.AddWithValue("@seed", seed);
             abrir.Parameters.AddWithValue("@version", datosVersion);
+            abrir.Parameters.AddWithValue("@hash", datosHash);
 
             // ⚠ Es una DECLARACIÓN del cliente y no se puede verificar nunca: el
             // área, la oleada y los ticks se re-derivan de la seed más el log; la

@@ -1,0 +1,327 @@
+{
+  // ---------------------------------------------------------------------------
+  //  El catálogo de perks.
+  //
+  //  LA LÍNEA QUE DIVIDE TODO PASA ENTRE PLATA Y ORO:
+  //    bronze, silver  -> NÚMEROS. Cualquier clase, se apilan.
+  //    gold, unique    -> COMPORTAMIENTOS. No se apilan.
+  //
+  //  De ahí sale la regla de apilado sin pensarla perk por perk: "Ricochet dos
+  //  veces" no quiere decir nada, "+100 de daño dos veces" sí. Y de ahí sale
+  //  también por qué un bronze puede decir 100 y un unique 50 sin que esté mal:
+  //  no se comparan en el mismo eje.
+  //
+  //  ⚠ EL JEFE OFRECE DOS ORO Y EL JUGADOR ELIGE UNO. Ocho por corrida.
+  //
+  //    Decía «es la ÚNICA fuente de oro» y «ofrece TRES»: las dos cosas dejaron
+  //    de ser ciertas cuando la tienda rotativa empezó a vender Oro —caro, como
+  //    mucho uno por visita— y el jefe bajó de tres ofertas a dos justamente por
+  //    eso: ocho elecciones de tres MÁS Oro comprable dejaba que casi cualquier
+  //    partida armara el Único que quisiera. El jefe final no suelta nada.
+  //  ⚠ LOS ÚNICOS NO CAEN Y NO SE COMPRAN: SE FUSIONAN (ver planos.json).
+  //    Que un unique aparezca en una tirada de drop es un bug de datos.
+  //
+  //  ⚠ ACÁ NO HAY NOMBRES PARA MOSTRAR. Cada perk tiene una "key" estable y su
+  //  nombre vive en Data\lang\<idioma>.json como «perk.<key>.name». Tener el
+  //  nombre acá lo ataba a un solo idioma y además lo volvía frágil: un renombre
+  //  masivo de identificadores pisó «Escarcha» y la dejó en «Frost» dentro de
+  //  los datos, que es exactamente el bug que esta separación hace imposible.
+  //
+  //  ⚠ Entra al hash de /run/start. Tocar un número acá es TEMPORADA NUEVA.
+  //
+  //  ⚠ "version" es el MISMO número en los ocho del hash; el que el cargador lee
+  //  de verdad es el de enemigos.json.
+  // ---------------------------------------------------------------------------
+  "version": 3,
+
+  // Cuántas copias del mismo perk entran en una clase. Es la regla de arriba
+  // hecha número: apilable si es un número, único si es un comportamiento.
+  //
+  // ⚠ Desde Drops_v2, además, UNA CLASE NO PUEDE EQUIPAR DOS COMPORTAMIENTOS.
+  // La ranura de comportamiento —el «Rasgo»— es una sola, y antes se podían
+  // meter tres Oro de los que solo uno hacía algo: dos slots y dos drops del
+  // jefe gastados en nada, sin que el juego avisara.
+  "maxStackedPerTier": { "bronze": 3, "silver": 2, "gold": 1, "unique": 1 },
+
+  // ⚠ El "id" se escribe A MANO y no sale de la posición en la lista.
+  //
+  // La mochila y el log de acciones guardan ids. Si el id fuera posicional,
+  // insertar un perk en el medio correría todos los de abajo y una corrida
+  // guardada se cargaría con otros perks equipados. Para agregar uno nuevo: usar
+  // el próximo id libre y NO reordenar la lista.
+  //
+  // ⚠ El id 25 quedó LIBRE Y SIN USAR: era «misilMagico», y el rework de
+  // Perks_Actuales_v2 lo dejó siendo exactamente Onda Expansiva v2 —mismo
+  // efecto, misma magnitud, mismo techo— para dos clases que ya la tenían. Un
+  // perk duplicado ocupa lugar en el pool de Oro y diluye las recetas sin
+  // agregar una decisión. El hueco se deja en vez de reciclar el id: reusar un
+  // id con otro significado es cómo una corrida guardada se carga con otra cosa.
+  //
+  // La "key" es la otra identidad, la que usan planos.json y los archivos de
+  // idioma. Va en minúscula, sin acentos y sin espacios, y NO SE CAMBIA NUNCA:
+  // cambiarla deja el nombre sin traducción y la receta sin ingrediente.
+  //
+  // "magnitude" está en puntos porcentuales salvo donde el comentario diga otra
+  // cosa. "magnitudeB" es el SEGUNDO número de los perks que combinan dos cosas
+  // —todos los unique, y las cadenas y quemaduras que pegan distinto al primero
+  // y al segundo—.
+  //
+  // "classes" vacío o ausente = sirve a las nueve.
+  "perks": [
+    // --- Bronze: números chicos, para las nueve clases -----------------------
+    { "id":  0, "key": "filo",       "tier": "bronze", "effect": "Damage",  "magnitude": 15 },
+    { "id":  1, "key": "pulso",      "tier": "bronze", "effect": "Cadence", "magnitude": 12 },
+    { "id":  2, "key": "vista",      "tier": "bronze", "effect": "Range",   "magnitude": 20 },
+    { "id":  3, "key": "temple",     "tier": "bronze", "effect": "Damage",  "magnitude": 10 },
+    { "id":  4, "key": "reflejos",   "tier": "bronze", "effect": "Cadence", "magnitude":  8 },
+    { "id":  5, "key": "punteria",   "tier": "bronze", "effect": "Range",   "magnitude": 15 },
+    { "id":  6, "key": "empunadura", "tier": "bronze", "effect": "Damage",  "magnitude": 12 },
+    { "id":  7, "key": "muneca",     "tier": "bronze", "effect": "Cadence", "magnitude": 10 },
+
+    // ⚠ El tercero de alcance, y existe por el SORTEO, no por la magnitud.
+    // Bronce y plata tenían 3 de daño, 3 de cadencia y 2 de alcance cada uno, y
+    // «Perks.Roll» sortea uniforme entre los del tier: el alcance salía un 25%
+    // de las veces contra un 37,5% de los otros dos ejes. Nadie lo decidió —es
+    // el residuo de haber escrito ocho por tier— y no se ve en ningún número del
+    // catálogo, solo en qué ofrece la tienda a lo largo de una corrida.
+    { "id": 53, "key": "mira",       "tier": "bronze", "effect": "Range",   "magnitude": 18 },
+
+    // --- Silver: más grandes -------------------------------------------------
+    // ⚠ halcon y ojoDeAguila NO HACÍAN NADA en las clases de alcance 2
+    // (2 × 1,40 = 2,8 → 2 por truncamiento entero): plata, 240 de oro, uno de
+    // los seis slots, y cero efecto en las cuatro cuerpo a cuerpo. Era la
+    // anomalía P0 de la propuesta V2.
+    //
+    // Se arregló escalando el alcance interno ×1000 —milésimas de celda— y NO
+    // subiendo estas magnitudes. Lo mismo vale para «punteria» y «vista» de
+    // bronce, que antes tampoco movían el número en ninguna clase.
+    { "id":  8, "key": "furia",       "tier": "silver", "effect": "Damage",  "magnitude": 35 },
+    { "id":  9, "key": "celeridad",   "tier": "silver", "effect": "Cadence", "magnitude": 25 },
+    { "id": 10, "key": "halcon",      "tier": "silver", "effect": "Range",   "magnitude": 40 },
+    { "id": 11, "key": "sana",        "tier": "silver", "effect": "Damage",  "magnitude": 30 },
+    { "id": 12, "key": "frenesi",     "tier": "silver", "effect": "Cadence", "magnitude": 22 },
+    { "id": 13, "key": "ojoDeAguila", "tier": "silver", "effect": "Range",   "magnitude": 35 },
+    { "id": 14, "key": "ira",         "tier": "silver", "effect": "Damage",  "magnitude": 28 },
+    { "id": 15, "key": "vendaval",    "tier": "silver", "effect": "Cadence", "magnitude": 20 },
+
+    // El tercero de alcance en plata, por el mismo motivo que «mira» en bronce:
+    // emparejar el sorteo, que estaba 3/3/2. La magnitud sigue la escala del
+    // tier —el alcance va más alto que el daño porque rinde menos por punto—.
+    { "id": 54, "key": "atalaya",     "tier": "silver", "effect": "Range",   "magnitude": 32 },
+
+    // =========================================================================
+    //  GOLD: comportamiento, compartido por 2-3 clases
+    // =========================================================================
+    //
+    //  Que un gold sirva para dos o tres clases es lo que hace escribible el
+    //  catálogo: con todo exclusivo harían falta entre 50 y 90 definiciones.
+    //
+    //  ⚠ NINGUNO LO DISPARA UN GOLPE SECUNDARIO. Splash, cadena, rebote, eco,
+    //  DoT y transferencia de overkill solo restan vida: no aplican estados, no
+    //  suben contadores y no crean más secundarios. Es la primera regla de
+    //  Estados_v2, y sin ella Cadena crea Cadena.
+    //
+    //  Los parámetros que NO son la magnitud —cada cuántos golpes dispara, a qué
+    //  distancia alcanza, cuántos secundarios toca— viven en combate.json,
+    //  agrupados por efecto.
+
+    // --- Daño y limpieza -----------------------------------------------------
+    { "id": 16, "key": "ricochet",          "tier": "gold", "effect": "Ricochet",    "magnitude":  55, "classes": ["Hunter", "Assassin"] },
+    { "id": 17, "key": "ondaExpansiva",     "tier": "gold", "effect": "Splash",      "magnitude":  35, "classes": ["Paladin", "Warrior", "Mage"] },
+    { "id": 19, "key": "golpeCertero",      "tier": "gold", "effect": "CriticalHit", "magnitude": 125, "classes": ["Assassin", "Thief", "Hunter"] },
+
+    // Cadena acotada: 40% al primer salto, 25% al segundo. Reemplaza al rebote
+    // global que tenía Descarga Eléctrica, que le pegaba al otro lado del mapa.
+    { "id": 20, "key": "descargaElectrica", "tier": "gold", "effect": "Chain",       "magnitude":  40, "magnitudeB": 25, "classes": ["Mage", "Bard"] },
+
+    // --- Control y desgaste --------------------------------------------------
+    { "id": 18, "key": "escarcha",          "tier": "gold", "effect": "Slow",        "magnitude":  25, "classes": ["Mage", "Druid", "Cleric"] },
+
+    // Quemadura al objetivo (20%) y una menor a hasta dos cercanos (15%). Pasó
+    // de splash bruto a DoT con identidad propia.
+    { "id": 21, "key": "tormentaDeFuego",   "tier": "gold", "effect": "Burn",        "magnitude":  20, "magnitudeB": 15, "classes": ["Druid", "Bard", "Mage"] },
+
+    // Veneno de verdad: 35% del golpe repartido en 3 segundos. Antes era un
+    // segundo golpe inmediato, o sea daño plano con nombre de veneno.
+    { "id": 22, "key": "envenenar",         "tier": "gold", "effect": "Poison",      "magnitude":  35, "classes": ["Assassin", "Druid"] },
+
+    // Era «torpeza», un segundo slow redundante. Ahora es utilidad defensiva:
+    // no sube el DPS de nadie, baja el castigo por filtrar.
+    { "id": 23, "key": "debilidad",         "tier": "gold", "effect": "Weaken",      "magnitude":  20, "classes": ["Bard", "Thief", "Cleric"] },
+
+    // Era «dardoMagico», Penetrante: ignoraba una defensa que los enemigos no
+    // tienen, así que era daño extra a cuarto de magnitud con nombre engañoso.
+    // Ahora aplica Vulnerable, que es soporte real y acotado.
+    { "id": 24, "key": "quebranto",         "tier": "gold", "effect": "Sunder",      "magnitude":   8, "classes": ["Warrior", "Paladin", "Cleric"] },
+
+    // --- Los trece nuevos de Perks_v2_Core -----------------------------------
+    //
+    // El catálogo viejo tenía diez Oro y ocho eran alguna forma de "pegá más
+    // fuerte" o "pegá a varios". Estos agregan los ejes que faltaban: foco,
+    // soporte, control posicional, economía y condicionales.
+
+    // +5% por golpe seguido al mismo objetivo, hasta 5 stacks.
+    { "id": 35, "key": "concentracion",     "tier": "gold", "effect": "Focus",           "magnitude":   5, "classes": ["Mage", "Hunter"] },
+
+    // La clase que marca NO cobra el bonus: crea composición, no auto-sinergia.
+    { "id": 36, "key": "marcaDeCaza",       "tier": "gold", "effect": "HuntMark",        "magnitude":  10, "classes": ["Hunter", "Thief"] },
+
+    // Sangrado por el 30% del golpe. Daño retrasado: fuerte contra tanques, peor
+    // contra lo que ya se iba a morir igual.
+    { "id": 37, "key": "hemorragia",        "tier": "gold", "effect": "Bleed",           "magnitude":  30, "classes": ["Assassin", "Warrior"] },
+
+    // Control duro con período refractario y tope por enemigo. La magnitud es
+    // el 100% de slow, o sea inmovilizar.
+    { "id": 38, "key": "raices",            "tier": "gold", "effect": "Root",            "magnitude": 100, "classes": ["Druid", "Cleric"] },
+
+    // ⚠ La magnitud es la DISTANCIA DEL EMPUJÓN, en milésimas de celda: media
+    // celda hacia atrás cada cinco ataques, hasta tres veces por enemigo.
+    { "id": 39, "key": "golpeSismico",      "tier": "gold", "effect": "Seismic",         "magnitude": 500, "classes": ["Warrior", "Paladin"] },
+
+    // Aura de cadencia a los aliados cercanos. Le da al Bardo y al Clérigo la
+    // identidad de soporte que el catálogo les prometía y no les daba.
+    { "id": 40, "key": "inspiracion",       "tier": "gold", "effect": "Inspire",         "magnitude":  10, "classes": ["Bard", "Cleric"] },
+
+    // Economía con dos topes: por enemigo y por oleada. Sin ellos, una build de
+    // oro se vuelve obligatoria.
+    { "id": 41, "key": "saqueo",            "tier": "gold", "effect": "Loot",            "magnitude":  20, "classes": ["Thief", "Bard"] },
+
+    // Remate sin el problema de Ejecutar: pega más, no mata de un golpe.
+    { "id": 42, "key": "oportunista",       "tier": "gold", "effect": "Opportunist",     "magnitude":  35, "classes": ["Assassin", "Thief"] },
+
+    // Vale 0% casi siempre y +50% en la única situación que importa. Es lo que
+    // le da función especial al alcance corto.
+    { "id": 43, "key": "guardiaDelUmbral",  "tier": "gold", "effect": "ThresholdGuard",  "magnitude":  50, "classes": ["Paladin", "Warrior"] },
+
+    // Un eco diferido cada cuatro golpes. Mecánica visible y predecible, sin RNG.
+    { "id": 44, "key": "ecoArcano",         "tier": "gold", "effect": "ArcaneEcho",      "magnitude":  35, "classes": ["Mage", "Bard"] },
+
+    // ⚠ Lleva Thief además de Hunter y Assassin porque es el componente del
+    // plano del Ladrón: sin la clase, el perk no cae nunca en una corrida de
+    // Ladrón y la receta de Invisibilidad es inalcanzable.
+    { "id": 45, "key": "sobrepenetracion",  "tier": "gold", "effect": "Overpenetration", "magnitude":  40, "classes": ["Hunter", "Assassin", "Thief"] },
+
+    // El opuesto de Oportunista: ayuda a abrir tanques en vez de a rematarlos.
+    { "id": 46, "key": "primerImpacto",     "tier": "gold", "effect": "FirstStrike",     "magnitude":  30, "classes": ["Hunter", "Mage"] },
+
+    // Convierte los huecos entre grupos en una ventaja. Una sola carga guardada.
+    { "id": 47, "key": "preparacion",       "tier": "gold", "effect": "Charge",          "magnitude":  60, "classes": ["Hunter", "Paladin"] },
+
+    // --- Los cinco que el motor ya hacía y el catálogo no ofrecía ------------
+    //
+    // ⚠ Los cinco comportamientos YA ESTABAN implementados, balanceados y con
+    // sus topes, pero SOLO como habilidad de arma. El jugador los veía si el
+    // generador se los regalaba y no tenía forma de buscarlos: cinco ejes de
+    // decisión que la corrida no podía elegir.
+    //
+    // ⚠ Y arreglan de paso el reparto del pool de Oro. Antes iba de 4 (Druida) a
+    // 7 (Cazador, Mago): con cuatro, la elección del jefe le ofrecía al Druida
+    // casi el catálogo entero y dejaba de elegir algo. Ahora va de 7 a 8, y por
+    // eso las clases de cada perk no son solo temáticas — se eligieron para
+    // emparejar, y el Mago quedó afuera de los cinco por ser el que más tenía.
+    //
+    // Los topes que no son la magnitud viven en «combate.json §behaviors», y son
+    // PROPIOS: más bajos que los del arma, porque un arma legendaria es el premio
+    // de una corrida y un Oro es uno de los ocho que reparte el juego.
+
+    // El pico es a alcance pleno y escala lineal con la distancia, así que
+    // promedia la mitad: +60 al borde vale como un condicional de ~+30. Va a las
+    // tres clases con alcance para que la distancia varíe de verdad; en las de
+    // alcance 2 el objetivo está casi siempre al borde y sería un +60 plano.
+    { "id": 48, "key": "tiroLejano",        "tier": "gold", "effect": "Marksman",    "magnitude": 60, "classes": ["Hunter", "Druid", "Cleric"] },
+
+    // El espejo exacto, para las tres de alcance 2.
+    //
+    // ⚠ Lo que lo hace rendir es DÓNDE está puesto el defensor, no a quién
+    // apunta: ninguno de los cuatro modos de targeting maximiza «cerca de mí»
+    // —los cuatro ordenan por avance en la ruta o por vida—. Un guerrero pegado
+    // al camino cobra casi el 60 entero; uno puesto en la fila de atrás, casi
+    // nada. Es el primer perk que le pone un número a la colocación.
+    { "id": 49, "key": "carniceria",        "tier": "gold", "effect": "Butchery",    "magnitude": 60, "classes": ["Warrior", "Paladin", "Thief"] },
+
+    // +3% por muerte de la oleada, techo 45% (combate.json). Arranca en cero cada
+    // oleada, así que premia al defensor puesto donde de verdad se mata y no
+    // sirve de nada contra un jefe solo.
+    { "id": 50, "key": "sedDeSangre",       "tier": "gold", "effect": "Bloodthirst", "magnitude":  3, "classes": ["Assassin", "Warrior", "Druid"] },
+
+    // Un segundo golpe por el 35%. Es el único Oro que es daño plano sin
+    // condición ni utilidad, y por eso es el más chico: el Doble del arma pega
+    // 70 y es legendario.
+    // ⚠ El segundo golpe es SECUNDARIO: no proccea nada, ni siquiera a sí mismo.
+    { "id": 51, "key": "golpeDoble",        "tier": "gold", "effect": "TwinStrike",  "magnitude": 35, "classes": ["Thief", "Bard", "Assassin"] },
+
+    // ⚠ La magnitud son PUNTOS de vida de la Torre, no un porcentaje. Dos cada 45
+    // ticks por clase, tope 60 por oleada: la versión chica de Vampirismo, que
+    // cura 1-8 cada 30 con tope 150. Es la única forma de recuperar vida de la
+    // Torre que no depende de encontrar un arma.
+    { "id": 52, "key": "drenaje",           "tier": "gold", "effect": "Siphon",      "magnitude":  2, "classes": ["Cleric", "Paladin", "Druid"] },
+
+    // =========================================================================
+    //  UNIQUE: NO caen, NO se compran. Se fusionan, y ocupan UN SOLO slot
+    // =========================================================================
+    //
+    //  Los nombres salen de los 41 hechizos reales de Dat\Hechizos.dat de Austral,
+    //  y viven en lang\.
+    //
+    //  ⚠ CADA ÚNICO VALE EXACTAMENTE LO QUE VALEN SUS DOS ORO, SIN REBAJA.
+    //
+    //  Antes iban rebajados a ~80% de cada componente, con este argumento: «si
+    //  sumara los dos completos, tener el Único sería estrictamente mejor que
+    //  tener los dos Oro». EL ARGUMENTO ERA FALSO, y la regla que lo invalida es
+    //  del mismo sistema: LA RANURA DE COMPORTAMIENTO ES UNA. Una clase no puede
+    //  equipar dos Oro —la mochila rebota el segundo—, así que «tener los dos» en
+    //  la misma clase no existe y no había con qué comparar.
+    //
+    //  Lo que fusionar cuesta de verdad, y sigue costando: se consumen DOS de los
+    //  ~8 Oro de toda la corrida, y el segundo podría haber ido a otra clase que
+    //  también lo usa. Eso ya es la decisión; la rebaja encima era un peaje que no
+    //  compraba nada.
+    //
+    //  ⚠ Y lo que medía: con la rebaja, la política `techo` fabricaba un Único por
+    //  corrida y llegaba EXACTAMENTE igual de lejos que la que no fusiona nunca
+    //  —69 contra 69 oleadas en 24 corridas—. Un premio que cuesta dos jefes, un
+    //  plano y una fusión no puede valer cero.
+    //
+    //  El premio sigue siendo doble: los dos efectos juntos, y en UN SOLO slot.
+    //
+    //  Los dos números de cada uno son "magnitude" y "magnitudeB", en el orden en
+    //  que la receta de planos.json nombra los componentes.
+
+    // Concentración (5% por stack, máx 5 = +25%) + Sobrepenetración (40%).
+    { "id": 26, "key": "perforacion",    "tier": "unique", "effect": "Perforation",    "magnitude":  5, "magnitudeB": 40, "classes": ["Hunter"] },
+
+    // Onda Expansiva (35% a máx 3) + Escarcha (-25% por 90 ticks).
+    { "id": 27, "key": "ondaDeFrio",     "tier": "unique", "effect": "FrostWave",      "magnitude": 35, "magnitudeB": 25, "classes": ["Mage"] },
+
+    // Guardia del Umbral (+50% vs los que muerden la Torre) + Quebranto (+8%).
+    { "id": 28, "key": "iraDeDios",      "tier": "unique", "effect": "WrathOfGod",     "magnitude": 50, "magnitudeB":  8, "classes": ["Paladin"] },
+
+    // Hemorragia (30%) + Oportunista (+35% bajo el umbral de vida).
+    { "id": 29, "key": "apocalipsis",    "tier": "unique", "effect": "Apocalypse",     "magnitude": 30, "magnitudeB": 35, "classes": ["Assassin"] },
+
+    // Raíces (15 ticks, en combate.json) + Tormenta de Fuego (20% al objetivo,
+    // 15% a hasta dos cercanos).
+    //
+    // ⚠ "magnitudeB" era 0 y el comentario decía que no era un olvido —la
+    // duración de la raíz sale de «uniques.terribleHungerRootTicks»—. La
+    // conclusión estaba bien y la consecuencia mal: al no haber segundo número,
+    // el código quemaba SOLO al objetivo y el componente Tormenta de Fuego
+    // entraba a menos de la mitad (20 contra 20 + 15 + 15). Ahora "magnitudeB"
+    // es la quemadura secundaria, igual que en el Oro del que sale.
+    { "id": 30, "key": "terribleHambre", "tier": "unique", "effect": "TerribleHunger", "magnitude": 20, "magnitudeB": 15, "classes": ["Druid"] },
+
+    // Inspiración (+10% cadencia) + Quebranto (+8% vulnerable).
+    { "id": 31, "key": "tormentaDivina", "tier": "unique", "effect": "DivineStorm",    "magnitude": 10, "magnitudeB":  8, "classes": ["Cleric"] },
+
+    // Inspiración (+10% cadencia) + Debilidad (-20% daño a la Torre).
+    { "id": 32, "key": "ceguera",        "tier": "unique", "effect": "Blindness",      "magnitude": 10, "magnitudeB": 20, "classes": ["Bard"] },
+
+    // ⚠ La magnitud es la DISTANCIA DEL EMPUJÓN en milésimas de celda, igual que
+    // en Golpe Sísmico. Golpe Sísmico (500) + Quebranto (+8% vulnerable). Estos
+    // dos ya estaban al valor pleno, así que no cambian.
+    { "id": 33, "key": "fuerza",         "tier": "unique", "effect": "Strength",       "magnitude": 500, "magnitudeB": 8, "classes": ["Warrior"] },
+
+    // Saqueo (+20% oro, topes propios) + Sobrepenetración (40%).
+    { "id": 34, "key": "invisibilidad",  "tier": "unique", "effect": "Invisibility",   "magnitude": 20, "magnitudeB": 40, "classes": ["Thief"] }
+  ]
+}

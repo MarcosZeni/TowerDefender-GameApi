@@ -35,20 +35,28 @@ public sealed record RevalidationResult(
 /// devuelve un detalle y no un veredicto: el que decide qué hacer con una corrida
 /// que no coincide es una persona.</para>
 /// </remarks>
-public sealed class Revalidator(Database db, ServerData datos)
+public sealed class Revalidator(Database db, ServerData datos, SimulationDataCatalog catalog)
 {
     /// <summary>
     /// Revalida una corrida y actualiza su columna <c>validado</c>.
     /// </summary>
     public async Task<RevalidationResult?> RevalidateAsync(
-        long idRun, BalanceData balance, CancellationToken ct)
+        long idRun, CancellationToken ct)
     {
         var fila = await LeerAsync(idRun, ct);
 
         if (fila is null)
             return null;
 
-        var (seed, ganoReclamado, oleadaReclamada, ticksReclamados, blob) = fila.Value;
+        var (seed, ganoReclamado, oleadaReclamada, ticksReclamados, blob, version, hash) = fila.Value;
+
+        // Sin snapshot verificable no se acusa al jugador ni se usa el balance actual.
+        var balance = hash is null ? null : catalog.Find(hash, version);
+        if (balance is null)
+            return new RevalidationResult(idRun, false,
+                $"no está disponible el snapshot de datos v{version} ({hash ?? "sin hash"})",
+                ticksReclamados, 0, oleadaReclamada, 0);
+
 
         if (blob is null || blob.Length == 0)
         {
@@ -94,11 +102,6 @@ public sealed class Revalidator(Database db, ServerData datos)
         // las corridas darían distinto.
         var mapa = Layouts.Choose(seed, balance);
 
-        // ⚠ TODO: el balance TIENE que ser el de la temporada de esa corrida,
-        // o sea el de `datos_version` de la fila. Hoy lo elige quien llama, y
-        // nadie llama todavía: el servidor no carga los JSON de balance del
-        // cliente. Revalidar con otros números da un resultado distinto y
-        // acusaría de trampa a un jugador honesto.
         var partida = new Run(seed, mapa, log, balance);
         partida.Start();
 
@@ -165,23 +168,28 @@ public sealed class Revalidator(Database db, ServerData datos)
     /// pocas: cada una es una simulación completa y puede llevar segundos de CPU.
     /// </remarks>
     public async Task<List<RevalidationResult>> RevalidatePendingAsync(
-        int cuantas, BalanceData balance, CancellationToken ct)
+        int cuantas, CancellationToken ct)
     {
         var ids = new List<long>();
+        var hashes = catalog.KnownHashes.ToArray();
+        string placeholders = string.Join(", ", hashes.Select((_, i) => $"@hash{i}"));
 
         await using (var conn = await db.OpenAsync(ct))
         await using (var cmd = new MySqlCommand(
-            """
+            $"""
             SELECT id FROM runs
             WHERE validado = 0
               AND motivo_cierre IN ('gano', 'perdio')
               AND log_acciones IS NOT NULL
               AND log_truncado = 0
+              AND datos_hash IN ({placeholders})
             ORDER BY id
             LIMIT @cuantas
             """, conn))
         {
             cmd.Parameters.AddWithValue("@cuantas", cuantas);
+            for (int i = 0; i < hashes.Length; i++)
+                cmd.Parameters.AddWithValue($"@hash{i}", hashes[i]);
 
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
@@ -192,7 +200,7 @@ public sealed class Revalidator(Database db, ServerData datos)
 
         foreach (long id in ids)
         {
-            var resultado = await RevalidateAsync(id, balance, ct);
+            var resultado = await RevalidateAsync(id, ct);
 
             if (resultado is not null)
                 salida.Add(resultado);
@@ -201,14 +209,14 @@ public sealed class Revalidator(Database db, ServerData datos)
         return salida;
     }
 
-    private async Task<(ulong Seed, bool Won, int Wave, int Ticks, byte[]? Log)?> LeerAsync(
+    private async Task<(ulong Seed, bool Won, int Wave, int Ticks, byte[]? Log, int Version, string? Hash)?> LeerAsync(
         long idRun, CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
 
         await using var cmd = new MySqlCommand(
             """
-            SELECT seed, gano, oleada, ticks, log_acciones
+            SELECT seed, gano, oleada, ticks, log_acciones, datos_version, datos_hash
             FROM runs WHERE id = @id LIMIT 1
             """, conn);
 
@@ -221,7 +229,7 @@ public sealed class Revalidator(Database db, ServerData datos)
 
         byte[]? log = r.IsDBNull(4) ? null : (byte[])r.GetValue(4);
 
-        return (r.GetUInt64(0), r.GetInt32(1) != 0, r.GetInt32(2), r.GetInt32(3), log);
+        return (r.GetUInt64(0), r.GetInt32(1) != 0, r.GetInt32(2), r.GetInt32(3), log, r.GetInt32(5), r.IsDBNull(6) ? null : r.GetString(6));
     }
 
     /// <summary>
